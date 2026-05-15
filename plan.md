@@ -121,17 +121,17 @@ ui/mindmap.ts → markmap 渲染四维度节点
 
 ### Phase 1 — 插件入口 & 命令注册
 
-- [ ] **1.1** `src/extension.ts`：activate/deactivate，注册 command + webview provider
-- [ ] **1.2** `package.json` manifest：contributes.commands（右键菜单）、contributes.views（侧边栏）、activationEvents
-- [ ] **1.3** `src/commands/analyzeModule.ts`：接收 `vscode.Uri`，触发分析流程，更新 webview 状态
+- [x] **1.1** `src/extension.ts`：activate/deactivate，注册 command + webview provider
+- [x] **1.2** `package.json` manifest：contributes.commands（右键菜单）、contributes.views（侧边栏）、activationEvents
+- [x] **1.3** `src/commands/analyzeModule.ts`：接收 `vscode.Uri`，触发分析流程，更新 webview 状态
 
 ### Phase 2 — 静态分析器
 
-- [ ] **2.1** `src/analyzer/types.ts`：定义全部类型（FileInfo、ModuleSkeleton 等）
-- [ ] **2.2** `src/analyzer/react-analyzer.ts`：ts-morph 解析 .ts/.tsx，提取 exports + imports
-- [ ] **2.3** `src/analyzer/vue-analyzer.ts`：解析 .vue SFC，提取 script 部分的 exports + imports
-- [ ] **2.4** `src/analyzer/mf-analyzer.ts`：查找并解析 webpack.config.js 的 `exposes`/`remotes`，标记 MF 依赖
-- [ ] **2.5** `src/analyzer/index.ts`：orchestrator，遍历文件夹，路由到对应 analyzer，汇总 ModuleSkeleton
+- [x] **2.1** `src/analyzer/types.ts`：定义全部类型（FileInfo、ModuleSkeleton 等）
+- [x] **2.2** `src/analyzer/react-analyzer.ts`：ts-morph 解析 .ts/.tsx，提取 exports + imports
+- [x] **2.3** `src/analyzer/vue-analyzer.ts`：解析 .vue SFC，提取 script 部分的 exports + imports
+- [x] **2.4** `src/analyzer/mf-analyzer.ts`：查找并解析 webpack.config.js 的 `exposes`/`remotes`，标记 MF 依赖
+- [x] **2.5** `src/analyzer/index.ts`：orchestrator，遍历文件夹，路由到对应 analyzer，汇总 ModuleSkeleton
 
 ### Phase 3 — AI 调用层
 
