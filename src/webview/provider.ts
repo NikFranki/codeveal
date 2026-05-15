@@ -315,8 +315,20 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       img.src = dataUrl;
     });
 
+    function waitForMarkmap(maxMs = 8000) {
+      return new Promise((resolve) => {
+        const start = Date.now();
+        (function poll() {
+          if (window.markmap?.Transformer && window.markmap?.Markmap) return resolve(true);
+          if (Date.now() - start > maxMs) return resolve(false);
+          setTimeout(poll, 60);
+        })();
+      });
+    }
+
     async function renderMindmap(markdown) {
       // markmap-autoloader registers window.markmap with Transformer + Markmap
+      await waitForMarkmap();
       const { Transformer, Markmap } = window.markmap;
       const transformer = new Transformer();
       const { root } = transformer.transform(markdown);
@@ -454,7 +466,10 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     if (saved && saved.markdown) {
       currentModulePath = saved.modulePath || '';
       showOnly(stateMindmap);
-      renderMindmap(saved.markdown).catch(() => {});
+      renderMindmap(saved.markdown).catch((err) => {
+        showOnly(stateError);
+        errorMessage.textContent = '⚠ 恢复失败: ' + (err && err.message || String(err));
+      });
     }
   </script>
 </body>
