@@ -3,6 +3,7 @@ import { ModuleAnalysis } from '../analyzer/types';
 // Extension → Webview
 export type ExtensionToWebviewMessage =
   | { type: 'loading'; modulePath: string }
+  | { type: 'progress'; step: string }
   | { type: 'error'; message: string; modulePath?: string }
   | { type: 'data'; analysis: ModuleAnalysis };
 

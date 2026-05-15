@@ -96,8 +96,30 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       margin-top: 40px; opacity: 0.6; text-align: center;
     }
     #state-loading {
-      display: none; align-items: center; gap: 10px; color: var(--vscode-descriptionForeground);
+      display: none; flex-direction: column;
+      padding: 20px 16px; gap: 0;
     }
+    #loading-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px; color: var(--vscode-descriptionForeground); font-size: 11px;
+    }
+    #loading-steps { display: flex; flex-direction: column; gap: 0; }
+    .step-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0; font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+      border-left: 2px solid transparent;
+    }
+    .step-row.step-done {
+      color: var(--vscode-foreground);
+      border-left-color: var(--vscode-terminal-ansiGreen, #4ec9b0);
+    }
+    .step-row.step-active {
+      color: var(--vscode-foreground);
+      border-left-color: var(--vscode-focusBorder, #007acc);
+    }
+    .step-icon { width: 14px; text-align: center; flex-shrink: 0; font-size: 11px; }
+    .step-text { flex: 1; line-height: 1.4; }
     #state-error {
       display: none; flex-direction: column; gap: 10px;
       padding: 16px; color: var(--vscode-errorForeground);
@@ -133,8 +155,8 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
     /* ── spinner ── */
     .spinner {
-      flex-shrink: 0; width: 16px; height: 16px;
-      border: 2px solid var(--vscode-descriptionForeground);
+      flex-shrink: 0; width: 12px; height: 12px;
+      border: 2px solid var(--vscode-focusBorder, #007acc);
       border-top-color: transparent; border-radius: 50%;
       animation: spin .7s linear infinite;
     }
@@ -157,8 +179,11 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div id="state-loading">
-    <div class="spinner"></div>
-    <span id="loading-path" style="word-break:break-all;font-size:11px;"></span>
+    <div id="loading-header">
+      <div class="spinner"></div>
+      <span id="loading-path" style="word-break:break-all;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    </div>
+    <div id="loading-steps"></div>
   </div>
 
   <div id="state-error">
@@ -190,12 +215,14 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     const stateError    = document.getElementById('state-error');
     const stateMindmap  = document.getElementById('state-mindmap');
     const loadingPath   = document.getElementById('loading-path');
+    const loadingSteps  = document.getElementById('loading-steps');
     const errorMessage  = document.getElementById('error-message');
     const retryBtn      = document.getElementById('retry-btn');
     const svgEl         = document.getElementById('mindmap');
 
     let mm = null;               // Markmap instance
     let currentModulePath = '';  // last analyzed folder, used by retry
+    let activeStepEl = null;     // current in-progress step row
 
     // ── flex containers need display:flex, others display:block ──
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
@@ -314,25 +341,61 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       }
     }, true);
 
+    // ── step list helpers ──────────────────────────────────
+    function addStep(text) {
+      // Mark previous active step as done
+      if (activeStepEl) {
+        activeStepEl.classList.remove('step-active');
+        activeStepEl.classList.add('step-done');
+        activeStepEl.querySelector('.step-icon').textContent = '✓';
+      }
+      const row = document.createElement('div');
+      row.className = 'step-row step-active';
+      row.innerHTML = '<span class="step-icon"><span class="spinner" style="display:inline-block;"></span></span>'
+                    + '<span class="step-text"></span>';
+      row.querySelector('.step-text').textContent = text;
+      loadingSteps.appendChild(row);
+      activeStepEl = row;
+    }
+
+    function finalizeSteps() {
+      if (activeStepEl) {
+        activeStepEl.classList.remove('step-active');
+        activeStepEl.classList.add('step-done');
+        activeStepEl.querySelector('.step-icon').textContent = '✓';
+        activeStepEl = null;
+      }
+    }
+
     // ── messages from extension ────────────────────────────
     window.addEventListener('message', async (event) => {
       const msg = event.data;
 
       if (msg.type === 'loading') {
         currentModulePath = msg.modulePath;
+        loadingSteps.innerHTML = '';
+        activeStepEl = null;
+        const short = msg.modulePath.split('/').filter(Boolean).slice(-2).join('/');
+        loadingPath.textContent = short || msg.modulePath;
         showOnly(stateLoading);
-        loadingPath.textContent = msg.modulePath;
+        return;
+      }
+
+      if (msg.type === 'progress') {
+        addStep(msg.step);
         return;
       }
 
       if (msg.type === 'error') {
         if (msg.modulePath) currentModulePath = msg.modulePath;
+        finalizeSteps();
         showOnly(stateError);
         errorMessage.textContent = '⚠ ' + msg.message;
         return;
       }
 
       if (msg.type === 'data') {
+        finalizeSteps();
         showOnly(stateMindmap);
         try {
           await renderMindmap(msg.markdown);

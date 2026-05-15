@@ -23,22 +23,30 @@ export async function analyzeModuleCommand(
         cancellable: false,
       },
       async (progress) => {
-        progress.report({ message: '扫描文件…' });
         const isFile = fs.statSync(uri.fsPath).isFile();
         const modulePath = isFile ? path.dirname(uri.fsPath) : uri.fsPath;
         const targetFile = isFile ? uri.fsPath : undefined;
+
+        progress.report({ message: '扫描文件…' });
+        provider.postMessage({ type: 'progress', step: '扫描文件结构…' });
         const skeleton = await analyzeModule(modulePath, getCompanyScopes(), targetFile);
 
+        const fileCount = skeleton.files.length;
+        provider.postMessage({ type: 'progress', step: `静态分析完成（${fileCount} 个文件）` });
+
         progress.report({ message: '检测 AI CLI…' });
+        provider.postMessage({ type: 'progress', step: '检测 AI CLI…' });
         const skill = await detectSkill(getAIProvider());
 
         let analysis: ModuleAnalysis;
 
         if (skill) {
+          provider.postMessage({ type: 'progress', step: `AI 语义分析中（${skill.name}）…` });
           progress.report({ message: `AI 分析中（${skill.name}）…` });
           const prompt = buildPrompt(skeleton);
           const rawOutput = await skill.run(prompt);
           const aiOutput = parseAIOutput(rawOutput);
+          provider.postMessage({ type: 'progress', step: 'AI 分析完成' });
 
           analysis = {
             ...skeleton,
@@ -64,6 +72,7 @@ export async function analyzeModuleCommand(
         }
 
         progress.report({ message: '渲染中…' });
+        provider.postMessage({ type: 'progress', step: '构建思维导图…' });
         provider.postMessage({ type: 'data', analysis });
       }
     );
