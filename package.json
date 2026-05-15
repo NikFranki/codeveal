@@ -1,0 +1,69 @@
+{
+  "name": "glimpse",
+  "displayName": "Glimpse",
+  "description": "右键模块文件夹，侧边栏展示四维度思维导图",
+  "version": "0.1.0",
+  "publisher": "glimpse-dev",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:glimpse.analyzeModule"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "glimpse.analyzeModule",
+        "title": "Glimpse: 分析此模块"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "glimpse.analyzeModule",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "glimpse.moduleView",
+          "name": "Glimpse 模块视图",
+          "when": "glimpse.hasAnalysis"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Glimpse",
+      "properties": {
+        "glimpse.aiProvider": {
+          "type": "string",
+          "enum": ["auto", "claude", "codex"],
+          "default": "auto",
+          "description": "指定使用的 AI CLI（auto 会自动检测）"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./tsconfig.json",
+    "watch": "tsc -watch -p ./tsconfig.json",
+    "vscode:prepublish": "npm run compile",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@vue/component-compiler-utils": "^3.3.0",
+    "ts-morph": "^21.0.0",
+    "vue-template-compiler": "^2.7.16"
+  }
+}
