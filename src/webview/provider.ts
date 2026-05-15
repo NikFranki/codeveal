@@ -111,7 +111,25 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       border: none; border-radius: 2px; cursor: pointer; font-size: 12px;
     }
     #retry-btn:hover { background: var(--vscode-button-hoverBackground); }
-    #state-mindmap { display: none; flex: 1; overflow: hidden; }
+    #state-mindmap { display: none; flex: 1; overflow: hidden; position: relative; }
+
+    /* ── toolbar ── */
+    #toolbar {
+      position: absolute; top: 6px; right: 6px; z-index: 10;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .tb-btn {
+      width: 28px; height: 28px; padding: 0;
+      background: var(--vscode-button-secondaryBackground, #3a3d41);
+      color: var(--vscode-button-secondaryForeground, #ccc);
+      border: 1px solid var(--vscode-widget-border, #555);
+      border-radius: 3px; cursor: pointer;
+      font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0.75; line-height: 1;
+    }
+    .tb-btn:hover { opacity: 1; background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+    .tb-sep { height: 1px; background: var(--vscode-widget-border, #555); margin: 2px 0; }
 
     /* ── spinner ── */
     .spinner {
@@ -149,6 +167,14 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div id="state-mindmap">
+    <div id="toolbar">
+      <button class="tb-btn" id="btn-fit"      title="适应屏幕">⊡</button>
+      <button class="tb-btn" id="btn-zoom-in"  title="放大">＋</button>
+      <button class="tb-btn" id="btn-zoom-out" title="缩小">－</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" id="btn-export-svg" title="导出 SVG" style="font-size:9px;">SVG</button>
+      <button class="tb-btn" id="btn-export-png" title="导出 PNG" style="font-size:9px;">PNG</button>
+    </div>
     <svg id="mindmap"></svg>
   </div>
 
@@ -183,6 +209,67 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       if (currentModulePath) {
         vscode.postMessage({ type: 'drillDown', folderPath: currentModulePath });
       }
+    });
+
+    // ── toolbar ────────────────────────────────────────────────
+    document.getElementById('btn-fit').addEventListener('click', () => mm?.fit());
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      if (!mm) return;
+      mm.zoom.scaleBy(mm.svg, 1.3);
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      if (!mm) return;
+      mm.zoom.scaleBy(mm.svg, 1 / 1.3);
+    });
+
+    document.getElementById('btn-export-svg').addEventListener('click', () => {
+      if (!svgEl) return;
+      const name = currentModulePath.split('/').filter(Boolean).pop() || 'mindmap';
+      // Clone SVG and embed minimal style so the exported file is self-contained
+      const clone = svgEl.cloneNode(true);
+      const bbox = svgEl.getBBox ? svgEl.getBBox() : { width: svgEl.clientWidth, height: svgEl.clientHeight, x: 0, y: 0 };
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', bbox.width || svgEl.clientWidth);
+      clone.setAttribute('height', bbox.height || svgEl.clientHeight);
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = 'text { fill: #ccc; font-family: sans-serif; font-size: 14px; } line, path { stroke: #555; }';
+      clone.insertBefore(style, clone.firstChild);
+      const svgStr = new XMLSerializer().serializeToString(clone);
+      const b64 = btoa(unescape(encodeURIComponent(svgStr)));
+      const a = document.createElement('a');
+      a.href = 'data:image/svg+xml;base64,' + b64;
+      a.download = name + '-mindmap.svg';
+      a.click();
+    });
+
+    document.getElementById('btn-export-png').addEventListener('click', () => {
+      if (!svgEl) return;
+      const name = currentModulePath.split('/').filter(Boolean).pop() || 'mindmap';
+      const w = svgEl.clientWidth || 1200;
+      const h = svgEl.clientHeight || 800;
+      const svgStr = new XMLSerializer().serializeToString(svgEl);
+      const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = 2; // retina
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        ctx.fillStyle = getComputedStyle(document.body).backgroundColor || '#1e1e1e';
+        ctx.fillRect(0, 0, w, h);
+        try {
+          ctx.drawImage(img, 0, 0, w, h);
+        } catch (_) { /* cross-origin taint — skip background draw */ }
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = name + '-mindmap.png';
+        a.click();
+      };
+      img.src = dataUrl;
     });
 
     async function renderMindmap(markdown) {
