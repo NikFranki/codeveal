@@ -7,6 +7,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
   private _pendingMessages: ExtensionToWebviewMessage[] = [];
+  private _lastDataMessage: ExtensionToWebviewMessage | null = null;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -40,10 +41,15 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
-    for (const msg of this._pendingMessages) {
-      this._send(msg);
+    if (this._pendingMessages.length > 0) {
+      for (const msg of this._pendingMessages) {
+        this._send(msg);
+      }
+      this._pendingMessages = [];
+    } else if (this._lastDataMessage) {
+      // Restore last result when panel is re-opened after being collapsed.
+      this._send(this._lastDataMessage);
     }
-    this._pendingMessages = [];
   }
 
   postMessage(message: ExtensionToWebviewMessage): void {
@@ -61,6 +67,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
   /** Enrich data messages with pre-built markdown before forwarding to the webview. */
   private _send(message: ExtensionToWebviewMessage): void {
     if (message.type === 'data') {
+      this._lastDataMessage = message;
       const markdown = buildMarkmapMarkdown(message.analysis);
       this._view?.webview.postMessage({ ...message, markdown });
     } else {
@@ -126,7 +133,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
     .step-icon { width: 14px; text-align: center; flex-shrink: 0; font-size: 11px; }
     .step-text { flex: 1; line-height: 1.4; }
-    .step-timer { color: var(--vscode-descriptionForeground); font-size: 10px; font-variant-numeric: tabular-nums; opacity: 0.6; flex-shrink: 0; margin-left: 4px; }
+    .step-timer { color: var(--vscode-focusBorder, #007acc); font-size: 11px; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: auto; padding-left: 8px; }
     #state-error {
       display: none; flex-direction: column; gap: 10px;
       padding: 16px; color: var(--vscode-errorForeground);
@@ -384,8 +391,11 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       stepStartTime = Date.now();
       const timerEl = row.querySelector('.step-timer');
       stepTimerInterval = setInterval(() => {
-        timerEl.textContent = Math.floor((Date.now() - stepStartTime) / 1000) + 's';
-      }, 1000);
+        const ms = Date.now() - stepStartTime;
+        timerEl.textContent = ms < 10000
+          ? (ms / 1000).toFixed(1) + 's'
+          : Math.floor(ms / 1000) + 's';
+      }, 100);
     }
 
     function finalizeSteps() {
@@ -431,12 +441,21 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         showOnly(stateMindmap);
         try {
           await renderMindmap(msg.markdown);
+          vscode.setState({ markdown: msg.markdown, modulePath: currentModulePath });
         } catch (err) {
           showOnly(stateError);
           stateError.textContent = '渲染失败: ' + (err && err.message || String(err));
         }
       }
     });
+
+    // ── restore state after panel close/reopen ─────────────
+    const saved = vscode.getState();
+    if (saved && saved.markdown) {
+      currentModulePath = saved.modulePath || '';
+      showOnly(stateMindmap);
+      renderMindmap(saved.markdown).catch(() => {});
+    }
   </script>
 </body>
 </html>`;

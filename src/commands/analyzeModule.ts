@@ -6,7 +6,15 @@ import { analyzeModule } from '../analyzer/index';
 import { detectSkill } from '../ai/detector';
 import { buildPrompt, parseAIOutput } from '../ai/prompt-builder';
 import { getAIProvider, getClaudeModel, getCompanyScopes } from '../config';
-import { ModuleAnalysis } from '../analyzer/types';
+import { ModuleAnalysis, ModuleSkeleton } from '../analyzer/types';
+
+function staticFallback(skeleton: ModuleSkeleton): ModuleAnalysis {
+  return {
+    ...skeleton,
+    ai: { responsibilities: ['（仅静态分析，AI 未运行）'], dataFlow: [] },
+    exportDescriptions: {},
+  };
+}
 
 export async function analyzeModuleCommand(
   provider: GlimpseViewProvider,
@@ -43,19 +51,25 @@ export async function analyzeModuleCommand(
         if (skill) {
           provider.postMessage({ type: 'progress', step: `AI 语义分析中（${skill.name}）…` });
           progress.report({ message: `AI 分析中（${skill.name}）…` });
-          const prompt = buildPrompt(skeleton);
-          const rawOutput = await skill.run(prompt);
-          const aiOutput = parseAIOutput(rawOutput);
-          provider.postMessage({ type: 'progress', step: 'AI 分析完成' });
-
-          analysis = {
-            ...skeleton,
-            ai: {
-              responsibilities: aiOutput.responsibilities,
-              dataFlow: aiOutput.dataFlow,
-            },
-            exportDescriptions: aiOutput.exportDescriptions,
-          };
+          try {
+            const prompt = buildPrompt(skeleton);
+            const rawOutput = await skill.run(prompt);
+            const aiOutput = parseAIOutput(rawOutput);
+            provider.postMessage({ type: 'progress', step: 'AI 分析完成' });
+            analysis = {
+              ...skeleton,
+              ai: {
+                responsibilities: aiOutput.responsibilities,
+                dataFlow: aiOutput.dataFlow,
+              },
+              exportDescriptions: aiOutput.exportDescriptions,
+            };
+          } catch (aiErr) {
+            const aiMsg = aiErr instanceof Error ? aiErr.message : String(aiErr);
+            provider.postMessage({ type: 'progress', step: 'AI 分析失败，使用静态分析兜底' });
+            vscode.window.showWarningMessage(`Glimpse: AI 分析失败（${aiMsg.slice(0, 120)}）`);
+            analysis = staticFallback(skeleton);
+          }
         } else {
           const picked = await vscode.window.showWarningMessage(
             'Glimpse: 未检测到 claude 或 codex CLI，仅显示静态分析结果',
@@ -64,11 +78,7 @@ export async function analyzeModuleCommand(
           if (picked === '打开设置') {
             vscode.commands.executeCommand('workbench.action.openSettings', 'glimpse.aiProvider');
           }
-          analysis = {
-            ...skeleton,
-            ai: { responsibilities: ['（未检测到 AI CLI，仅显示静态分析）'], dataFlow: [] },
-            exportDescriptions: {},
-          };
+          analysis = staticFallback(skeleton);
         }
 
         progress.report({ message: '渲染中…' });
