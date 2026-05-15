@@ -8,6 +8,8 @@ const execFileAsync = promisify(execFile);
 export class ClaudeSkill implements AISkill {
   readonly name = 'claude';
 
+  constructor(private readonly model = 'claude-haiku-4-5-20251001') {}
+
   async isAvailable(): Promise<boolean> {
     try {
       await execFileAsync('which', ['claude']);
@@ -18,16 +20,27 @@ export class ClaudeSkill implements AISkill {
   }
 
   run(prompt: string): Promise<string> {
-    return spawnAndCollect('claude', ['--print', prompt]);
+    // Pass prompt via stdin to avoid OS arg-length limits on large modules.
+    return spawnAndCollect('claude', ['--print', '--model', this.model], prompt);
   }
 }
 
-export function spawnAndCollect(cmd: string, args: string[], timeoutMs = 120_000): Promise<string> {
+export function spawnAndCollect(
+  cmd: string,
+  args: string[],
+  stdinData: string | null = null,
+  timeoutMs = 120_000
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
     let stdout = '';
     let stderr = '';
+
+    if (stdinData !== null) {
+      child.stdin?.write(stdinData, 'utf8');
+      child.stdin?.end();
+    }
 
     child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
     child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });

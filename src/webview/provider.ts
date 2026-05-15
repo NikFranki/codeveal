@@ -25,6 +25,9 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         case 'openFile':
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.filePath));
           break;
+        case 'openFolder':
+          vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(msg.folderPath));
+          break;
         case 'openUrl':
           vscode.env.openExternal(vscode.Uri.parse(msg.url));
           break;
@@ -349,6 +352,11 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         e.stopPropagation();
         const pkg = decodeURIComponent(href.slice('glimpse-pkg:'.length));
         vscode.postMessage({ type: 'openUrl', url: 'https://www.npmjs.com/package/' + pkg });
+      } else if (href.startsWith('glimpse-mod:')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const folderPath = decodeURIComponent(href.slice('glimpse-mod:'.length));
+        vscode.postMessage({ type: 'openFolder', folderPath });
       }
     }, true);
 

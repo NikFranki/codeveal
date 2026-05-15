@@ -5,7 +5,7 @@ import { GlimpseViewProvider } from '../webview/provider';
 import { analyzeModule } from '../analyzer/index';
 import { detectSkill } from '../ai/detector';
 import { buildPrompt, parseAIOutput } from '../ai/prompt-builder';
-import { getAIProvider, getCompanyScopes } from '../config';
+import { getAIProvider, getClaudeModel, getCompanyScopes } from '../config';
 import { ModuleAnalysis } from '../analyzer/types';
 
 export async function analyzeModuleCommand(
@@ -36,7 +36,7 @@ export async function analyzeModuleCommand(
 
         progress.report({ message: '检测 AI CLI…' });
         provider.postMessage({ type: 'progress', step: '检测 AI CLI…' });
-        const skill = await detectSkill(getAIProvider());
+        const skill = await detectSkill(getAIProvider(), getClaudeModel());
 
         let analysis: ModuleAnalysis;
 

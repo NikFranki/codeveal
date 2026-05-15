@@ -42,7 +42,11 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
     if (crossModuleDeps.length > 0) {
       lines.push('', '- 项目内跨模块');
       for (const dep of crossModuleDeps) {
-        lines.push(`  - ${dep}`);
+        const resolved = resolveAlias(dep, analysis.modulePath);
+        const node = resolved
+          ? `[${dep}](glimpse-mod:${encodeURIComponent(resolved)})`
+          : dep;
+        lines.push(`  - ${node}`);
       }
     }
 
@@ -117,6 +121,30 @@ function collectCrossModuleDeps(files: FileInfo[]): string[] {
     }
   }
   return [...deps].sort();
+}
+
+/**
+ * Resolve a webpack/tsconfig alias like `@/common` to an absolute filesystem
+ * path by walking up from the module directory looking for `src/<sub>`.
+ * Returns null if nothing is found on disk.
+ */
+function resolveAlias(dep: string, modulePath: string): string | null {
+  const prefix = dep.startsWith('@/') ? 2 : dep.startsWith('~/') ? 2 : 0;
+  if (prefix === 0) return null;
+  const sub = dep.slice(prefix); // e.g. 'common' from '@/common'
+
+  let dir = path.dirname(modulePath);
+  for (let i = 0; i < 8; i++) {
+    const candidate = path.join(dir, 'src', sub);
+    try {
+      fs.accessSync(candidate);
+      return candidate;
+    } catch { /* keep walking */ }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
 }
 
 /**
