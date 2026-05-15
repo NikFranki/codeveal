@@ -151,9 +151,9 @@ ui/mindmap.ts → markmap 渲染四维度节点
 
 ### Phase 5 — 配置 & 体验
 
-- [ ] **5.1** `src/config.ts`：读取 `glimpse.aiProvider` 设置（auto / claude / codex）
-- [ ] **5.2** `package.json` contributes.configuration：暴露 aiProvider 配置项
-- [ ] **5.3** 加载中状态、错误提示（AI 不可用时的友好 fallback）
+- [x] **5.1** `src/config.ts`：读取 `glimpse.aiProvider` 设置（auto / claude / codex）
+- [x] **5.2** `package.json` contributes.configuration：暴露 aiProvider 配置项
+- [x] **5.3** 加载中状态、错误提示（AI 不可用时的友好 fallback）
 
 ### Phase 6 — Vue2 & MF 补全（P1）
 
