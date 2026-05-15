@@ -25,6 +25,9 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         case 'openFile':
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.filePath));
           break;
+        case 'openUrl':
+          vscode.env.openExternal(vscode.Uri.parse(msg.url));
+          break;
         case 'drillDown':
           vscode.commands.executeCommand(
             'glimpse.analyzeModule',
@@ -120,6 +123,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
     .step-icon { width: 14px; text-align: center; flex-shrink: 0; font-size: 11px; }
     .step-text { flex: 1; line-height: 1.4; }
+    .step-timer { color: var(--vscode-descriptionForeground); font-size: 10px; font-variant-numeric: tabular-nums; opacity: 0.6; flex-shrink: 0; margin-left: 4px; }
     #state-error {
       display: none; flex-direction: column; gap: 10px;
       padding: 16px; color: var(--vscode-errorForeground);
@@ -223,6 +227,8 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     let mm = null;               // Markmap instance
     let currentModulePath = '';  // last analyzed folder, used by retry
     let activeStepEl = null;     // current in-progress step row
+    let stepTimerInterval = null;
+    let stepStartTime = 0;
 
     // ── flex containers need display:flex, others display:block ──
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
@@ -338,12 +344,22 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         e.stopPropagation();
         const filePath = decodeURIComponent(href.slice('glimpse-file:'.length));
         vscode.postMessage({ type: 'openFile', filePath });
+      } else if (href.startsWith('glimpse-pkg:')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const pkg = decodeURIComponent(href.slice('glimpse-pkg:'.length));
+        vscode.postMessage({ type: 'openUrl', url: 'https://www.npmjs.com/package/' + pkg });
       }
     }, true);
 
     // ── step list helpers ──────────────────────────────────
+    function clearStepTimer() {
+      if (stepTimerInterval) { clearInterval(stepTimerInterval); stepTimerInterval = null; }
+    }
+
     function addStep(text) {
-      // Mark previous active step as done
+      clearStepTimer();
+      // Mark previous active step as done (keep its elapsed time)
       if (activeStepEl) {
         activeStepEl.classList.remove('step-active');
         activeStepEl.classList.add('step-done');
@@ -352,13 +368,20 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       const row = document.createElement('div');
       row.className = 'step-row step-active';
       row.innerHTML = '<span class="step-icon"><span class="spinner" style="display:inline-block;"></span></span>'
-                    + '<span class="step-text"></span>';
+                    + '<span class="step-text"></span>'
+                    + '<span class="step-timer">0s</span>';
       row.querySelector('.step-text').textContent = text;
       loadingSteps.appendChild(row);
       activeStepEl = row;
+      stepStartTime = Date.now();
+      const timerEl = row.querySelector('.step-timer');
+      stepTimerInterval = setInterval(() => {
+        timerEl.textContent = Math.floor((Date.now() - stepStartTime) / 1000) + 's';
+      }, 1000);
     }
 
     function finalizeSteps() {
+      clearStepTimer();
       if (activeStepEl) {
         activeStepEl.classList.remove('step-active');
         activeStepEl.classList.add('step-done');
@@ -373,6 +396,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
       if (msg.type === 'loading') {
         currentModulePath = msg.modulePath;
+        clearStepTimer();
         loadingSteps.innerHTML = '';
         activeStepEl = null;
         const short = msg.modulePath.split('/').filter(Boolean).slice(-2).join('/');

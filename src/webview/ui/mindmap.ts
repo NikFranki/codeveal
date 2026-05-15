@@ -49,14 +49,14 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
     if (analysis.companyDeps.length > 0) {
       lines.push('', '- 公司共享库');
       for (const dep of analysis.companyDeps) {
-        lines.push(`  - ${dep}`);
+        lines.push(`  - [${dep}](glimpse-pkg:${encodeURIComponent(dep)})`);
       }
     }
 
     if (analysis.externalDeps.length > 0) {
       lines.push('', '- npm 包');
       for (const dep of analysis.externalDeps) {
-        lines.push(`  - ${dep}`);
+        lines.push(`  - [${dep}](glimpse-pkg:${encodeURIComponent(dep)})`);
       }
     }
 

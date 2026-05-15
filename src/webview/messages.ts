@@ -10,4 +10,5 @@ export type ExtensionToWebviewMessage =
 // Webview → Extension
 export type WebviewToExtensionMessage =
   | { type: 'openFile'; filePath: string }
+  | { type: 'openUrl'; url: string }
   | { type: 'drillDown'; folderPath: string };
