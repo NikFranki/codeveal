@@ -3,7 +3,7 @@ import { GlimpseViewProvider } from '../webview/provider';
 import { analyzeModule } from '../analyzer/index';
 import { detectSkill } from '../ai/detector';
 import { buildPrompt, parseAIOutput } from '../ai/prompt-builder';
-import { getAIProvider } from '../config';
+import { getAIProvider, getCompanyScopes } from '../config';
 import { ModuleAnalysis } from '../analyzer/types';
 
 export async function analyzeModuleCommand(
@@ -22,7 +22,7 @@ export async function analyzeModuleCommand(
       },
       async (progress) => {
         progress.report({ message: '扫描文件…' });
-        const skeleton = await analyzeModule(uri.fsPath);
+        const skeleton = await analyzeModule(uri.fsPath, getCompanyScopes());
 
         progress.report({ message: '检测 AI CLI…' });
         const skill = await detectSkill(getAIProvider());

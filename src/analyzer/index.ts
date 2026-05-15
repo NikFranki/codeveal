@@ -12,7 +12,10 @@ const IGNORED_DIRS = new Set([
   '__tests__', 'test', 'tests', 'coverage',
 ]);
 
-export async function analyzeModule(modulePath: string): Promise<ModuleSkeleton> {
+export async function analyzeModule(
+  modulePath: string,
+  companyScopes: string[] = []
+): Promise<ModuleSkeleton> {
   const mfConfig = findMFConfig(modulePath);
   const mfRemoteNames = mfConfig?.remoteNames ?? [];
 
@@ -53,11 +56,14 @@ export async function analyzeModule(modulePath: string): Promise<ModuleSkeleton>
     }
   }
 
+  const { externalDeps, companyDeps } = collectDeps(fileInfos, companyScopes);
+
   return {
     modulePath,
     files: fileInfos,
     publicExports: extractPublicExports(modulePath, fileInfos, project),
-    externalDeps: collectExternalDeps(fileInfos),
+    externalDeps,
+    companyDeps,
     mfDeps: collectMFDeps(fileInfos),
   };
 }
@@ -125,20 +131,33 @@ function guessExportKind(name: string): ExportInfo['kind'] {
   return 'unknown';
 }
 
-function collectExternalDeps(files: FileInfo[]): string[] {
-  const deps = new Set<string>();
+function collectDeps(
+  files: FileInfo[],
+  companyScopes: string[]
+): { externalDeps: string[]; companyDeps: string[] } {
+  const npmSet = new Set<string>();
+  const companySet = new Set<string>();
+
   for (const file of files) {
     for (const imp of file.imports) {
-      if (imp.kind === 'thirdParty') {
-        // Normalize 'react-dom/client' → 'react-dom', '@scope/pkg/sub' → '@scope/pkg'
-        const pkg = imp.source.startsWith('@')
-          ? imp.source.split('/').slice(0, 2).join('/')
-          : imp.source.split('/')[0];
-        deps.add(pkg);
+      if (imp.kind !== 'thirdParty') continue;
+      // Normalize 'react-dom/client' → 'react-dom', '@scope/pkg/sub' → '@scope/pkg'
+      const pkg = imp.source.startsWith('@')
+        ? imp.source.split('/').slice(0, 2).join('/')
+        : imp.source.split('/')[0];
+
+      if (companyScopes.some((s) => pkg.startsWith(s))) {
+        companySet.add(pkg);
+      } else {
+        npmSet.add(pkg);
       }
     }
   }
-  return [...deps].sort();
+
+  return {
+    externalDeps: [...npmSet].sort(),
+    companyDeps: [...companySet].sort(),
+  };
 }
 
 function collectMFDeps(files: FileInfo[]): MFDep[] {

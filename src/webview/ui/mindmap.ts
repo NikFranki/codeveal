@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ModuleAnalysis } from '../../analyzer/types';
+import { FileInfo, ModuleAnalysis } from '../../analyzer/types';
 
 /**
  * Converts a ModuleAnalysis into markmap-flavored markdown.
@@ -25,19 +25,43 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
     }
   }
 
-  // ── 外部依赖 ──────────────────────────────────────────────
-  if (analysis.externalDeps.length > 0) {
-    lines.push('', '## 外部依赖');
-    for (const dep of analysis.externalDeps) {
-      lines.push(`- ${dep}`);
-    }
-  }
+  // ── 外部依赖（四分组）──────────────────────────────────────
+  const crossModuleDeps = collectCrossModuleDeps(analysis.files);
+  const hasAnyDep =
+    crossModuleDeps.length > 0 ||
+    analysis.companyDeps.length > 0 ||
+    analysis.externalDeps.length > 0 ||
+    analysis.mfDeps.length > 0;
 
-  // ── MF 跨 App 依赖 ────────────────────────────────────────
-  if (analysis.mfDeps.length > 0) {
-    lines.push('', '## MF 跨 App 依赖');
-    for (const dep of analysis.mfDeps) {
-      lines.push(`- ${dep.remote}${dep.exposedPath}`);
+  if (hasAnyDep) {
+    lines.push('', '## 外部依赖');
+
+    if (crossModuleDeps.length > 0) {
+      lines.push('', '- 项目内跨模块');
+      for (const dep of crossModuleDeps) {
+        lines.push(`  - ${dep}`);
+      }
+    }
+
+    if (analysis.companyDeps.length > 0) {
+      lines.push('', '- 公司共享库');
+      for (const dep of analysis.companyDeps) {
+        lines.push(`  - ${dep}`);
+      }
+    }
+
+    if (analysis.externalDeps.length > 0) {
+      lines.push('', '- npm 包');
+      for (const dep of analysis.externalDeps) {
+        lines.push(`  - ${dep}`);
+      }
+    }
+
+    if (analysis.mfDeps.length > 0) {
+      lines.push('', '- MF 跨 App');
+      for (const dep of analysis.mfDeps) {
+        lines.push(`  - ${dep.remote}${dep.exposedPath}`);
+      }
     }
   }
 
@@ -53,6 +77,21 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
   }
 
   return lines.join('\n');
+}
+
+/** Collect unique @/ alias import roots used across all files in the module. */
+function collectCrossModuleDeps(files: FileInfo[]): string[] {
+  const deps = new Set<string>();
+  for (const file of files) {
+    for (const imp of file.imports) {
+      if (imp.source.startsWith('@/') || imp.source.startsWith('~/')) {
+        // '@/common/utils/foo' → '@/common'
+        const parts = imp.source.split('/');
+        deps.add(parts.slice(0, 2).join('/'));
+      }
+    }
+  }
+  return [...deps].sort();
 }
 
 /**

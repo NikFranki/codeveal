@@ -7,3 +7,13 @@ export function getAIProvider(): AIProvider {
     vscode.workspace.getConfiguration('glimpse').get<AIProvider>('aiProvider') ?? 'auto'
   );
 }
+
+const DEFAULT_COMPANY_SCOPES = ['@scfe', '@spx', '@ssc', '@sc/', 'ssc-', 'sc-cli'];
+
+export function getCompanyScopes(): string[] {
+  return (
+    vscode.workspace
+      .getConfiguration('glimpse')
+      .get<string[]>('companyScopes') ?? DEFAULT_COMPANY_SCOPES
+  );
+}

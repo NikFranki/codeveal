@@ -30,7 +30,8 @@ export interface ModuleSkeleton {
   modulePath: string;
   files: FileInfo[];
   publicExports: ExportInfo[];
-  externalDeps: string[];
+  externalDeps: string[];   // public npm packages
+  companyDeps: string[];    // company-internal packages (matched by glimpse.companyScopes)
   mfDeps: MFDep[];
 }
 

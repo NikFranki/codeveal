@@ -41,6 +41,12 @@
     "configuration": {
       "title": "Glimpse",
       "properties": {
+        "glimpse.companyScopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["@scfe", "@spx", "@ssc", "@sc/", "ssc-", "sc-cli"],
+          "description": "包名前缀列表，匹配的包视为公司内部包，在思维导图中单独分组展示"
+        },
         "glimpse.aiProvider": {
           "type": "string",
           "enum": ["auto", "claude", "codex"],

@@ -28,8 +28,12 @@ export function buildPrompt(skeleton: ModuleSkeleton): string {
     lines.push('');
   }
 
+  if (skeleton.companyDeps.length > 0) {
+    lines.push(`公司共享库: ${skeleton.companyDeps.join(', ')}`, '');
+  }
+
   if (skeleton.externalDeps.length > 0) {
-    lines.push(`外部依赖: ${skeleton.externalDeps.join(', ')}`, '');
+    lines.push(`npm 包: ${skeleton.externalDeps.join(', ')}`, '');
   }
 
   if (skeleton.mfDeps.length > 0) {
