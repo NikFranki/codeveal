@@ -56,7 +56,7 @@ export async function analyzeModule(modulePath: string): Promise<ModuleSkeleton>
   return {
     modulePath,
     files: fileInfos,
-    publicExports: extractPublicExports(modulePath, fileInfos),
+    publicExports: extractPublicExports(modulePath, fileInfos, project),
     externalDeps: collectExternalDeps(fileInfos),
     mfDeps: collectMFDeps(fileInfos),
   };
@@ -87,16 +87,33 @@ function collectFiles(dir: string): string[] {
   return results;
 }
 
-function extractPublicExports(modulePath: string, files: FileInfo[]): ExportInfo[] {
-  const indexFile = files.find((f) =>
-    ['index.ts', 'index.tsx', 'index.js'].includes(f.relativePath)
-  );
+function extractPublicExports(
+  modulePath: string,
+  files: FileInfo[],
+  project: Project
+): ExportInfo[] {
+  const indexRelPaths = ['index.ts', 'index.tsx', 'index.js'];
+  const indexFile = files.find((f) => indexRelPaths.includes(f.relativePath));
   if (!indexFile) return [];
 
+  const indexAbsPath = path.join(modulePath, indexFile.relativePath);
+  const sf = project.getSourceFile(indexAbsPath);
+
+  if (sf) {
+    // Use ts-morph to resolve re-exports to their actual declaration file
+    const result: ExportInfo[] = [];
+    for (const [name, decls] of sf.getExportedDeclarations()) {
+      const declFile = decls[0]?.getSourceFile().getFilePath() ?? indexAbsPath;
+      result.push({ name, kind: guessExportKind(name), filePath: declFile });
+    }
+    return result;
+  }
+
+  // Fallback: all point to index file
   return indexFile.exports.map((name) => ({
     name,
     kind: guessExportKind(name),
-    filePath: path.join(modulePath, indexFile.relativePath),
+    filePath: indexAbsPath,
   }));
 }
 

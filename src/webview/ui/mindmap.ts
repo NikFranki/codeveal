@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { ModuleAnalysis } from '../../analyzer/types';
 
@@ -44,9 +45,33 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
   if (analysis.ai.dataFlow.length > 0) {
     lines.push('', '## 数据流');
     for (const flow of analysis.ai.dataFlow) {
-      lines.push(`- ${flow.from} → ${flow.through} → ${flow.to}`);
+      const from = linkifyPaths(flow.from, analysis.modulePath);
+      const through = linkifyPaths(flow.through, analysis.modulePath);
+      const to = linkifyPaths(flow.to, analysis.modulePath);
+      lines.push(`- ${from} → ${through} → ${to}`);
     }
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Detect relative file path patterns (e.g. "list/index.tsx", "api.ts") in a
+ * plain-text string and wrap any that actually exist on disk into a
+ * glimpse-file: link so markmap renders them as clickable anchors.
+ */
+function linkifyPaths(text: string, modulePath: string): string {
+  // Matches optional leading folder segments + filename with a known extension
+  return text.replace(
+    /\b((?:[\w-]+\/)*[\w-]+\.(?:tsx|ts|vue|js))\b/g,
+    (match) => {
+      const absPath = path.join(modulePath, match);
+      try {
+        fs.accessSync(absPath);
+        return `[${match}](glimpse-file:${encodeURIComponent(absPath)})`;
+      } catch {
+        return match; // file not found — keep as plain text
+      }
+    }
+  );
 }

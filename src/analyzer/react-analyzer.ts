@@ -35,6 +35,8 @@ export function classifyImport(
   mfRemoteNames: string[]
 ): 'local' | 'thirdParty' | 'mf' {
   if (source.startsWith('.')) return 'local';
+  // '@/' and '~/' are common webpack/CRA aliases that resolve to src/
+  if (source.startsWith('@/') || source.startsWith('~/')) return 'local';
   for (const remote of mfRemoteNames) {
     if (source === remote || source.startsWith(`${remote}/`)) return 'mf';
   }

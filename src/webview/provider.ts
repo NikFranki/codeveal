@@ -199,16 +199,19 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
 
     // ── node click → open file ─────────────────────────────
-    svgEl.addEventListener('click', (e) => {
+    // Use capture phase so we intercept before the webview's default link
+    // navigation swallows the unknown "glimpse-file:" scheme silently.
+    document.addEventListener('click', (e) => {
       const a = e.target.closest('a');
       if (!a) return;
       const href = a.getAttribute('href') ?? '';
       if (href.startsWith('glimpse-file:')) {
         e.preventDefault();
+        e.stopPropagation();
         const filePath = decodeURIComponent(href.slice('glimpse-file:'.length));
         vscode.postMessage({ type: 'openFile', filePath });
       }
-    });
+    }, true);
 
     // ── messages from extension ────────────────────────────
     window.addEventListener('message', async (event) => {
