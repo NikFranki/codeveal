@@ -14,12 +14,13 @@ const IGNORED_DIRS = new Set([
 
 export async function analyzeModule(
   modulePath: string,
-  companyScopes: string[] = []
+  companyScopes: string[] = [],
+  targetFile?: string   // when set, analyse only this single file
 ): Promise<ModuleSkeleton> {
   const mfConfig = findMFConfig(modulePath);
   const mfRemoteNames = mfConfig?.remoteNames ?? [];
 
-  const allFiles = collectFiles(modulePath);
+  const allFiles = targetFile ? [targetFile] : collectFiles(modulePath);
   const tsFiles = allFiles.filter((f) => /\.(ts|tsx|js)$/.test(f));
   const vueFiles = allFiles.filter((f) => f.endsWith('.vue'));
 
@@ -61,7 +62,9 @@ export async function analyzeModule(
   return {
     modulePath,
     files: fileInfos,
-    publicExports: extractPublicExports(modulePath, fileInfos, project),
+    publicExports: targetFile
+      ? extractSingleFileExports(targetFile, fileInfos, project)
+      : extractPublicExports(modulePath, fileInfos, project),
     externalDeps,
     companyDeps,
     mfDeps: collectMFDeps(fileInfos),
@@ -91,6 +94,30 @@ function collectFiles(dir: string): string[] {
 
   walk(dir);
   return results;
+}
+
+function extractSingleFileExports(
+  filePath: string,
+  files: FileInfo[],
+  project: Project
+): ExportInfo[] {
+  const sf = project.getSourceFile(filePath);
+  if (sf) {
+    const result: ExportInfo[] = [];
+    for (const [name, decls] of sf.getExportedDeclarations()) {
+      const declFile = decls[0]?.getSourceFile().getFilePath() ?? filePath;
+      result.push({ name, kind: guessExportKind(name), filePath: declFile });
+    }
+    return result;
+  }
+  // Fallback: use already-parsed FileInfo
+  const fileInfo = files[0];
+  if (!fileInfo) return [];
+  return fileInfo.exports.map((name) => ({
+    name,
+    kind: guessExportKind(name),
+    filePath,
+  }));
 }
 
 function extractPublicExports(

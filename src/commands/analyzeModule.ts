@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { GlimpseViewProvider } from '../webview/provider';
 import { analyzeModule } from '../analyzer/index';
@@ -22,7 +24,10 @@ export async function analyzeModuleCommand(
       },
       async (progress) => {
         progress.report({ message: '扫描文件…' });
-        const skeleton = await analyzeModule(uri.fsPath, getCompanyScopes());
+        const isFile = fs.statSync(uri.fsPath).isFile();
+        const modulePath = isFile ? path.dirname(uri.fsPath) : uri.fsPath;
+        const targetFile = isFile ? uri.fsPath : undefined;
+        const skeleton = await analyzeModule(modulePath, getCompanyScopes(), targetFile);
 
         progress.report({ message: '检测 AI CLI…' });
         const skill = await detectSkill(getAIProvider());

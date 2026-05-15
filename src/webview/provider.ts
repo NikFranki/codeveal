@@ -278,11 +278,25 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       const transformer = new Transformer();
       const { root } = transformer.transform(markdown);
 
+      // Fold file-level nodes (depth >= 3) by default so Props/State/方法 are
+      // collapsed until the user clicks to expand. Depth 0 = root, 1 = sections
+      // (模块职责…), 2 = feature/group, 3 = file nodes inside data flow.
+      foldAtDepth(root, 0);
+
       if (!mm) {
         mm = Markmap.create(svgEl, { zoom: true, pan: true });
       }
       await mm.setData(root);
       mm.fit();
+    }
+
+    function foldAtDepth(node, depth) {
+      if (depth >= 3 && node.children && node.children.length > 0) {
+        node.payload = Object.assign({}, node.payload, { fold: 1 });
+      }
+      for (const child of (node.children || [])) {
+        foldAtDepth(child, depth + 1);
+      }
     }
 
     // ── node click → open file ─────────────────────────────

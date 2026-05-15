@@ -26,6 +26,11 @@
           "command": "glimpse.analyzeModule",
           "when": "explorerResourceIsFolder",
           "group": "navigation"
+        },
+        {
+          "command": "glimpse.analyzeModule",
+          "when": "!explorerResourceIsFolder && resourceExtname =~ /\\.(ts|tsx|vue|js)$/",
+          "group": "navigation"
         }
       ]
     },
