@@ -9,7 +9,8 @@
   },
   "categories": ["Other"],
   "activationEvents": [
-    "onCommand:glimpse.analyzeModule"
+    "onCommand:glimpse.analyzeModule",
+    "onView:glimpse.moduleView"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -33,8 +34,7 @@
         {
           "type": "webview",
           "id": "glimpse.moduleView",
-          "name": "Glimpse 模块视图",
-          "when": "glimpse.hasAnalysis"
+          "name": "Glimpse 模块视图"
         }
       ]
     },

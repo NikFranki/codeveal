@@ -1,14 +1,23 @@
 import * as vscode from 'vscode';
+import { GlimpseViewProvider } from './webview/provider';
+import { analyzeModuleCommand } from './commands/analyzeModule';
 
 export function activate(context: vscode.ExtensionContext): void {
-  const disposable = vscode.commands.registerCommand(
-    'glimpse.analyzeModule',
-    async (uri: vscode.Uri) => {
-      vscode.window.showInformationMessage(`Glimpse: 分析 ${uri.fsPath}`);
-    }
+  const provider = new GlimpseViewProvider(context.extensionUri);
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(GlimpseViewProvider.viewId, provider)
   );
 
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('glimpse.analyzeModule', (uri: vscode.Uri) => {
+      analyzeModuleCommand(provider, uri).catch((err: unknown) => {
+        vscode.window.showErrorMessage(
+          `Glimpse 出错: ${err instanceof Error ? err.message : String(err)}`
+        );
+      });
+    })
+  );
 }
 
 export function deactivate(): void {}
