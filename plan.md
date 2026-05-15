@@ -135,19 +135,19 @@ ui/mindmap.ts → markmap 渲染四维度节点
 
 ### Phase 3 — AI 调用层
 
-- [ ] **3.1** `src/ai/types.ts`：AISkill 接口、AIOutput 类型
-- [ ] **3.2** `src/ai/claude-skill.ts`：`claude --print "<prompt>"` 子进程调用，解析 JSON
-- [ ] **3.3** `src/ai/detector.ts`：`which claude` / `which codex`，返回可用 skill 实例
-- [ ] **3.4** `src/ai/prompt-builder.ts`：ModuleSkeleton → prompt 字符串（控制在 1500 token 内）
-- [ ] **3.5** `src/ai/codex-skill.ts`：codex 适配（P1，claude 通了再做）
+- [x] **3.1** `src/ai/types.ts`：AISkill 接口、AIOutput 类型
+- [x] **3.2** `src/ai/claude-skill.ts`：`claude --print "<prompt>"` 子进程调用，解析 JSON
+- [x] **3.3** `src/ai/detector.ts`：`which claude` / `which codex`，返回可用 skill 实例
+- [x] **3.4** `src/ai/prompt-builder.ts`：ModuleSkeleton → prompt 字符串（控制在 1500 token 内）
+- [x] **3.5** `src/ai/codex-skill.ts`：codex 适配（P1，claude 通了再做）
 
 ### Phase 4 — Webview & 思维导图
 
-- [ ] **4.1** `src/webview/messages.ts`：Extension → Webview 的消息类型（loading / data / error）
-- [ ] **4.2** `src/webview/provider.ts`：注册侧边栏 WebviewViewProvider，处理 resolveWebviewView
-- [ ] **4.3** `src/webview/ui/index.html`：HTML 模板，引入 markmap CDN（或本地 bundle）
-- [ ] **4.4** `src/webview/ui/mindmap.ts`：接收 ModuleAnalysis，生成 markmap markdown，渲染四维度
-- [ ] **4.5** 节点点击跳转源文件（postMessage 回 extension → `vscode.open`）
+- [x] **4.1** `src/webview/messages.ts`：Extension → Webview 的消息类型（loading / data / error）
+- [x] **4.2** `src/webview/provider.ts`：注册侧边栏 WebviewViewProvider，处理 resolveWebviewView
+- [x] **4.3** `src/webview/ui/index.html`：HTML 模板，引入 markmap CDN（或本地 bundle）
+- [x] **4.4** `src/webview/ui/mindmap.ts`：接收 ModuleAnalysis，生成 markmap markdown，渲染四维度
+- [x] **4.5** 节点点击跳转源文件（postMessage 回 extension → `vscode.open`）
 
 ### Phase 5 — 配置 & 体验
 
