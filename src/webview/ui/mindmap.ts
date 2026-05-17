@@ -26,9 +26,9 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
       group.push(e);
       byFile.set(e.filePath, group);
     }
-    for (const [filePath, exports] of byFile) {
+    for (const [filePath] of byFile) {
       const fileName = filePath.split('/').pop() ?? filePath;
-      const kind = exports[0].kind;
+      const kind = fileKindFromName(fileName);
       const encoded = encodeURIComponent(filePath);
       lines.push(`- [${fileName} *(${kind})*](glimpse-file:${encoded})`);
     }
@@ -172,4 +172,12 @@ function linkifyPaths(text: string, modulePath: string): string {
       }
     }
   );
+}
+
+function fileKindFromName(fileName: string): string {
+  const base = fileName.replace(/\.(tsx?|vue|js)$/, '');
+  if (/\.(tsx|vue)$/.test(fileName)) return 'component';
+  if (/^use[A-Z]/.test(base)) return 'hook';
+  if (/^types?$/i.test(base) || /[Tt]ype$/.test(base)) return 'type';
+  return 'util';
 }
