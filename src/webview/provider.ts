@@ -232,6 +232,19 @@ export class GlimpsePanelManager {
     .g-node-label { fill: var(--vscode-foreground, #ccc); pointer-events: none; }
     .g-empty { fill: var(--vscode-descriptionForeground, #888); font-size: 13px; }
 
+    /* ── reset-folds button ── */
+    #g-reset-folds {
+      position: absolute;
+      bottom: 12px; right: 12px;
+      padding: 4px 10px;
+      background: var(--vscode-button-secondaryBackground, #3a3d41);
+      color: var(--vscode-button-secondaryForeground, #ccc);
+      border: 1px solid var(--vscode-widget-border, #555);
+      border-radius: 3px; cursor: pointer; font-size: 11px;
+      z-index: 5; opacity: 0.8;
+    }
+    #g-reset-folds:hover { opacity: 1; background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+
     /* ── graph legend ── */
     #g-legend {
       position: absolute;
@@ -330,6 +343,7 @@ export class GlimpsePanelManager {
     <div id="graph-pane" style="display:none;">
       <svg id="graph-svg"></svg>
       <div id="g-tooltip"></div>
+      <button id="g-reset-folds" style="display:none;">↩ 折叠目录</button>
       <div id="g-legend">
         <span class="g-legend-arrow">A ──→ B</span>
         <span class="g-legend-text">A 导入了 B（A 依赖 B）</span>
@@ -366,6 +380,12 @@ export class GlimpsePanelManager {
     let activeTab = 'mindmap';
     let nodeHideTimer = null;
     let expandedDirs = new Set();
+
+    // "Collapse dirs" reset button
+    document.getElementById('g-reset-folds').addEventListener('click', () => {
+      expandedDirs = new Set();
+      if (currentGraph) renderGraph(currentGraph);
+    });
 
     // Tooltip stays open while mouse is inside it (interactive sections)
     const gTooltipEl = document.getElementById('g-tooltip');
@@ -494,53 +514,78 @@ export class GlimpsePanelManager {
     }
 
     function computeVisibleGraph(graph) {
-      const foldedSet = new Set(
-        (graph.foldedDirs || []).filter(function(d) { return !expandedDirs.has(d); })
-      );
-      if (!foldedSet.size) {
-        return { nodes: graph.nodes, edges: graph.edges };
-      }
+      const foldableDirs = new Set(graph.foldedDirs || []);
+      if (!foldableDirs.size) return { nodes: graph.nodes, edges: graph.edges };
+
+      // Build dir metadata
       const dirCounts = new Map();
       const dirDepths = new Map();
       for (const n of graph.nodes) {
         const d = n.dir;
-        if (d && foldedSet.has(d)) {
+        if (d && foldableDirs.has(d)) {
           dirCounts.set(d, (dirCounts.get(d) || 0) + 1);
           if (!dirDepths.has(d) || n.depth < dirDepths.get(d)) dirDepths.set(d, n.depth);
         }
       }
-      const foldedNodeMap = new Map();
+
+      // Map foldable file id → its dir
+      const fileToDir = new Map();
       for (const n of graph.nodes) {
-        if (n.dir && foldedSet.has(n.dir)) foldedNodeMap.set(n.id, 'dir:' + n.dir);
+        if (n.dir && foldableDirs.has(n.dir)) fileToDir.set(n.id, n.dir);
       }
+
+      // Build visible nodes: dir node always present; file nodes only when expanded
       const visibleNodes = [];
-      const seenDirNodes = new Set();
+      const seenDirs = new Set();
       for (const n of graph.nodes) {
-        if (foldedNodeMap.has(n.id)) {
-          const dirId = foldedNodeMap.get(n.id);
-          if (!seenDirNodes.has(dirId)) {
-            seenDirNodes.add(dirId);
-            const dir = n.dir;
+        if (n.dir && foldableDirs.has(n.dir)) {
+          const dir = n.dir;
+          if (!seenDirs.has(dir)) {
+            seenDirs.add(dir);
+            const isExpanded = expandedDirs.has(dir);
+            const rw = Math.max(120, dir.length * 8 + 44);
             visibleNodes.push({
-              id: dirId, label: dir, path: dir,
+              id: 'dir:' + dir, label: dir, path: dir,
               depth: dirDepths.get(dir) || 0,
               dir: '', usage: '', state: [], behaviors: [], methods: [],
               isDir: true, fileCount: dirCounts.get(dir),
+              expanded: isExpanded, rectW: rw,
             });
           }
+          if (expandedDirs.has(n.dir)) visibleNodes.push(n);
         } else {
           visibleNodes.push(n);
         }
       }
+
+      // Resolve a file id to its visible representative
+      function resolveId(id) {
+        const dir = fileToDir.get(id);
+        if (!dir) return id;
+        if (expandedDirs.has(dir)) return id;
+        return 'dir:' + dir;
+      }
+
       const edgeKeys = new Set();
       const visibleEdges = [];
-      for (const e of graph.edges) {
-        const from = foldedNodeMap.get(e.from) || e.from;
-        const to   = foldedNodeMap.get(e.to)   || e.to;
-        if (from === to) continue;
+      function addEdge(from, to, type) {
+        if (from === to) return;
         const key = from + '\0' + to;
-        if (!edgeKeys.has(key)) { edgeKeys.add(key); visibleEdges.push({ from, to }); }
+        if (!edgeKeys.has(key)) { edgeKeys.add(key); visibleEdges.push({ from, to, type }); }
       }
+
+      // Remap import edges
+      for (const e of graph.edges) addEdge(resolveId(e.from), resolveId(e.to), 'import');
+
+      // Member edges: dir node → its expanded file nodes (for visual grouping)
+      for (const dir of expandedDirs) {
+        if (!foldableDirs.has(dir)) continue;
+        const dirId = 'dir:' + dir;
+        for (const n of graph.nodes) {
+          if (n.dir === dir) addEdge(dirId, n.id, 'member');
+        }
+      }
+
       return { nodes: visibleNodes, edges: visibleEdges };
     }
 
@@ -563,6 +608,9 @@ export class GlimpsePanelManager {
       const W = svgEl.clientWidth  || document.getElementById('graph-pane').clientWidth  || 800;
       const H = svgEl.clientHeight || document.getElementById('graph-pane').clientHeight || 600;
 
+      // Show reset button when at least one dir has been expanded
+      document.getElementById('g-reset-folds').style.display = expandedDirs.size > 0 ? 'block' : 'none';
+
       // Apply directory folding, then clone so D3 can mutate freely
       const vg = computeVisibleGraph(graph);
       const nodes = vg.nodes.map((n) => ({ ...n }));
@@ -571,17 +619,16 @@ export class GlimpsePanelManager {
       const svgSel = d3.select(svgEl);
       const COLORS = d3.schemeTableau10;
       const NODE_R = 24;
-      const DIR_R  = 42;
       const CURVE_OFFSET = 34;
-      function nodeR(n) { return n && n.isDir ? DIR_R : NODE_R; }
+      function nodeR(n) { return n && n.isDir ? (n.rectW || 120) / 2 + 2 : NODE_R; }
 
       // Color nodes by AI feature group (same group = same colour)
       const groups = [...new Set(nodes.map((n) => n.featureGroup).filter(Boolean))];
       const groupColor = new Map(groups.map((g, i) => [g, COLORS[i % COLORS.length]]));
 
-      // Bidirectional edge detection
-      const reverseSet = new Set(edges.map((e) => e.to + '\0' + e.from));
-      function isBidi(e) { return reverseSet.has(e.from + '\0' + e.to); }
+      // Bidirectional edge detection (import edges only)
+      const reverseSet = new Set(edges.filter((e) => e.type === 'import').map((e) => e.to + '\0' + e.from));
+      function isBidi(e) { return e.type === 'import' && reverseSet.has(e.from + '\0' + e.to); }
       function bidiSign(e) { return e.from <= e.to ? 1 : -1; }
 
       function makePath(d) {
@@ -631,21 +678,22 @@ export class GlimpsePanelManager {
         .force('charge',    d3.forceManyBody().strength(-500))
         .force('x',         d3.forceX(W / 2).strength(0.04))
         .force('y',         d3.forceY((n) => (n.depth + 0.8) * levelH).strength(0.55))
-        .force('collision', d3.forceCollide((n) => (n.isDir ? DIR_R + 18 : NODE_R + 22)));
+        .force('collision', d3.forceCollide((n) => (n.isDir ? (n.rectW || 120) / 2 + 12 : NODE_R + 22)));
       graphSimulation = simulation;
 
       // Edge paths
       const link = g.append('g').selectAll('path')
         .data(edges).join('path')
         .attr('class', 'g-link')
-        .attr('stroke-width', (e) => isBidi(e) ? 2 : 1.5)
-        .attr('stroke-opacity', (e) => isBidi(e) ? 0.75 : 0.5)
+        .attr('stroke-width', (e) => e.type === 'member' ? 1 : isBidi(e) ? 2 : 1.5)
+        .attr('stroke-opacity', (e) => e.type === 'member' ? 0.2 : isBidi(e) ? 0.75 : 0.5)
+        .attr('stroke-dasharray', (e) => e.type === 'member' ? '3,3' : null)
         .attr('fill', 'none')
-        .attr('marker-end', 'url(#g-arrow)');
+        .attr('marker-end', (e) => e.type === 'member' ? null : 'url(#g-arrow)');
 
-      // Wider transparent hit area for edge hover
+      // Wider transparent hit area for import edges only
       const linkHit = g.append('g').selectAll('path')
-        .data(edges).join('path')
+        .data(edges.filter((e) => e.type === 'import')).join('path')
         .attr('stroke', 'transparent').attr('stroke-width', 14)
         .attr('fill', 'none').attr('cursor', 'default');
 
@@ -694,9 +742,9 @@ export class GlimpsePanelManager {
 
       function buildNodeHTML(n) {
         if (n.isDir) {
-          return '<strong style="font-size:12px;">📁 ' + n.label + '/</strong>'
+          return '<strong style="font-size:12px;">' + (n.expanded ? '▼' : '▶') + ' 📁 ' + n.label + '/</strong>'
             + '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.fileCount + ' 个文件</div>'
-            + '<div style="margin-top:8px;font-size:10px;opacity:0.4;">点击展开目录</div>';
+            + '<div style="margin-top:8px;font-size:10px;opacity:0.4;">点击' + (n.expanded ? '折叠' : '展开') + '目录</div>';
         }
         let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
         if (n.usage) {
@@ -744,21 +792,22 @@ export class GlimpsePanelManager {
       nodeG.each(function(n) {
         const sel = d3.select(this);
         if (n.isDir) {
-          const rw = 80, rh = 28;
+          const rw = n.rectW || 120, rh = 28;
           sel.append('rect')
             .attr('x', -rw / 2).attr('y', -rh / 2)
             .attr('width', rw).attr('height', rh).attr('rx', 5)
-            .attr('fill', '#243447').attr('fill-opacity', 0.92)
+            .attr('fill', n.expanded ? '#1a2a3a' : '#243447')
+            .attr('fill-opacity', n.expanded ? 0.55 : 0.92)
             .attr('stroke', 'var(--vscode-foreground, #ccc)')
             .attr('stroke-width', 1.5).attr('stroke-dasharray', '5,3');
           sel.append('text')
             .attr('text-anchor', 'middle').attr('dy', 5).attr('font-size', 11)
             .attr('fill', 'var(--vscode-foreground, #ccc)').attr('pointer-events', 'none')
-            .text('📁 ' + n.label);
+            .text((n.expanded ? '▼ ' : '▶ ') + n.label);
           sel.append('text').attr('class', 'g-node-label')
             .attr('text-anchor', 'middle').attr('dy', rh / 2 + 14).attr('font-size', 10)
             .attr('pointer-events', 'none')
-            .text(n.fileCount + ' 个文件 · 点击展开');
+            .text(n.fileCount + ' 个文件 · 点击' + (n.expanded ? '折叠' : '展开'));
         } else {
           sel.append('circle').attr('r', NODE_R)
             .attr('fill', groupColor.get(n.featureGroup) ?? '#6c7a8a')
@@ -789,7 +838,8 @@ export class GlimpsePanelManager {
         .on('click', (ev, n) => {
           if (nodeDragged) { nodeDragged = false; return; }
           if (n.isDir) {
-            expandedDirs.add(n.path);
+            if (expandedDirs.has(n.path)) expandedDirs.delete(n.path);
+            else expandedDirs.add(n.path);
             renderGraph(currentGraph);
             return;
           }
