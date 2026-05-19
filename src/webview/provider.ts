@@ -626,6 +626,22 @@ export class GlimpsePanelManager {
       const groups = [...new Set(nodes.map((n) => n.featureGroup).filter(Boolean))];
       const groupColor = new Map(groups.map((g, i) => [g, COLORS[i % COLORS.length]]));
 
+      // Update legend: arrow rule + one dot row per feature group
+      const legendEl = document.getElementById('g-legend');
+      legendEl.innerHTML =
+        '<span class="g-legend-arrow">A ──→ B</span>'
+        + '<span class="g-legend-text">A 导入了 B（A 依赖 B）</span>';
+      if (groups.length) {
+        legendEl.innerHTML += '<div style="margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;display:flex;flex-direction:column;gap:3px;">'
+          + groups.map((g) =>
+              '<div style="display:flex;align-items:center;gap:5px;">'
+              + '<span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:' + groupColor.get(g) + ';display:inline-block;"></span>'
+              + '<span class="g-legend-text" style="font-size:10px;">' + g + '</span>'
+              + '</div>'
+            ).join('')
+          + '</div>';
+      }
+
       // Bidirectional edge detection (import edges only)
       const reverseSet = new Set(edges.filter((e) => e.type === 'import').map((e) => e.to + '\0' + e.from));
       function isBidi(e) { return e.type === 'import' && reverseSet.has(e.from + '\0' + e.to); }
