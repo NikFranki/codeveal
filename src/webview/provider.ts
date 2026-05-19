@@ -228,9 +228,25 @@ export class GlimpsePanelManager {
 
     /* ── D3 graph styles ── */
     .g-link { stroke: var(--vscode-descriptionForeground, #888); stroke-opacity: 0.55; fill: none; }
-    .g-label { fill: var(--vscode-descriptionForeground, #999); pointer-events: none; }
     .g-node-label { fill: var(--vscode-foreground, #ccc); pointer-events: none; }
     .g-empty { fill: var(--vscode-descriptionForeground, #888); font-size: 13px; }
+
+    /* ── edge tooltip ── */
+    #g-tooltip {
+      display: none;
+      position: absolute;
+      max-width: 220px;
+      padding: 6px 10px;
+      background: var(--vscode-editorHoverWidget-background, #252526);
+      border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+      color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+      font-size: 12px; line-height: 1.6;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      pointer-events: none;
+      z-index: 20;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -266,7 +282,10 @@ export class GlimpsePanelManager {
       <button class="tb-btn" id="btn-export-png" title="导出 PNG" style="font-size:9px;">PNG</button>
     </div>
     <div id="mindmap-pane"><svg id="mindmap"></svg></div>
-    <div id="graph-pane" style="display:none;"><svg id="graph-svg"></svg></div>
+    <div id="graph-pane" style="display:none;">
+      <svg id="graph-svg"></svg>
+      <div id="g-tooltip"></div>
+    </div>
   </div>
 
   <!-- D3 v7 for the feature relation graph (cdn.jsdelivr.net is whitelisted in CSP) -->
@@ -436,15 +455,43 @@ export class GlimpsePanelManager {
 
       const svgSel = d3.select(svgEl);
       const COLORS = d3.schemeTableau10;
+      const NODE_R = 26;  // circle radius
+      const ARROW_OFFSET = NODE_R + 4;  // line endpoint stops here from node center
 
-      // Arrowhead marker
+      // Detect bidirectional pairs: A→B + B→A on the same chord
+      const reverseSet = new Set(edges.map((e) => e.to + '\0' + e.from));
+      function isBidi(e) { return reverseSet.has(e.from + '\0' + e.to); }
+      // Consistent curve sign so both A→B and B→A arc to the same spatial side
+      function bidiSign(e) { return e.from <= e.to ? 1 : -1; }
+      const CURVE_OFFSET = 36; // px, how far the arc bows out
+
+      // Build SVG path string: straight for one-way, quadratic arc for two-way
+      function makePath(d) {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        // Clip endpoints to circle edge so arrow sits at the rim
+        const x1 = d.source.x + (dx / dist) * ARROW_OFFSET;
+        const y1 = d.source.y + (dy / dist) * ARROW_OFFSET;
+        const x2 = d.target.x - (dx / dist) * ARROW_OFFSET;
+        const y2 = d.target.y - (dy / dist) * ARROW_OFFSET;
+        if (isBidi(d)) {
+          const s = bidiSign(d) * CURVE_OFFSET;
+          const mx = (x1 + x2) / 2 + s * (-dy / dist);
+          const my = (y1 + y2) / 2 + s * ( dx / dist);
+          return 'M' + x1 + ',' + y1 + 'Q' + mx + ',' + my + ' ' + x2 + ',' + y2;
+        }
+        return 'M' + x1 + ',' + y1 + 'L' + x2 + ',' + y2;
+      }
+
+      // Arrow marker — refX=10 puts the tip exactly at the path endpoint
       svgSel.append('defs').append('marker')
         .attr('id', 'g-arrow').attr('viewBox', '0 -5 10 10')
-        .attr('refX', 30).attr('refY', 0)
-        .attr('markerWidth', 6).attr('markerHeight', 6)
+        .attr('refX', 10).attr('refY', 0)
+        .attr('markerWidth', 8).attr('markerHeight', 8)
         .attr('orient', 'auto')
         .append('path').attr('d', 'M0,-5L10,0L0,5')
-        .attr('fill', 'var(--vscode-descriptionForeground, #888)');
+        .attr('fill', 'var(--vscode-foreground, #ccc)');
 
       const g = svgSel.append('g');
 
@@ -456,23 +503,49 @@ export class GlimpsePanelManager {
 
       // Force simulation
       const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(edges).id((n) => n.id).distance(200))
-        .force('charge', d3.forceManyBody().strength(-500))
+        .force('link', d3.forceLink(edges).id((n) => n.id).distance(280))
+        .force('charge', d3.forceManyBody().strength(-900))
         .force('center', d3.forceCenter(W / 2, H / 2))
-        .force('collision', d3.forceCollide(55));
+        .force('collision', d3.forceCollide(80));
       graphSimulation = simulation;
 
-      // Links
-      const link = g.append('g').selectAll('line')
-        .data(edges).join('line')
-        .attr('class', 'g-link').attr('stroke-width', 1.5)
+      // Visible edge paths (use path not line — supports curves for bidi edges)
+      const link = g.append('g').selectAll('path')
+        .data(edges).join('path')
+        .attr('class', 'g-link')
+        .attr('stroke-width', (e) => isBidi(e) ? 2 : 1.5)
+        .attr('stroke-opacity', (e) => isBidi(e) ? 0.75 : 0.55)
+        .attr('fill', 'none')
         .attr('marker-end', 'url(#g-arrow)');
 
-      // Edge labels
-      const linkLabel = g.append('g').selectAll('text')
-        .data(edges).join('text')
-        .attr('class', 'g-label').attr('font-size', 10).attr('text-anchor', 'middle')
-        .text((e) => e.label);
+      // Transparent wider hit area for edge hover
+      const linkHit = g.append('g').selectAll('path')
+        .data(edges).join('path')
+        .attr('stroke', 'transparent').attr('stroke-width', 14)
+        .attr('fill', 'none').attr('cursor', 'pointer');
+
+      // Custom HTML tooltip (full text, word-wrapped, follows cursor)
+      const graphPane = document.getElementById('graph-pane');
+      const tooltip   = document.getElementById('g-tooltip');
+
+      function posTooltip(ev) {
+        const rect = graphPane.getBoundingClientRect();
+        let x = ev.clientX - rect.left + 14;
+        let y = ev.clientY - rect.top  - 10;
+        if (x + 234 > graphPane.clientWidth)  x = ev.clientX - rect.left - 234;
+        if (y + 60   > graphPane.clientHeight) y = ev.clientY - rect.top  - 60;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top  = y + 'px';
+      }
+
+      linkHit
+        .on('mouseenter', (ev, e) => {
+          tooltip.textContent = (isBidi(e) ? '⇄ ' : '') + e.label;
+          tooltip.style.display = 'block';
+          posTooltip(ev);
+        })
+        .on('mousemove', (ev) => posTooltip(ev))
+        .on('mouseleave', () => { tooltip.style.display = 'none'; });
 
       // Node groups
       const nodeG = g.append('g').selectAll('g')
@@ -482,28 +555,19 @@ export class GlimpsePanelManager {
           .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
           .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
-      nodeG.append('circle').attr('r', 22)
+      nodeG.append('circle').attr('r', NODE_R)
         .attr('fill', (_, i) => COLORS[i % COLORS.length])
-        .attr('fill-opacity', 0.85)
+        .attr('fill-opacity', 0.9)
         .attr('stroke', 'var(--vscode-editor-background, #1e1e1e)').attr('stroke-width', 2);
 
-      // Short label inside circle
-      nodeG.append('text')
-        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-        .attr('font-size', 10).attr('fill', '#fff').attr('pointer-events', 'none')
-        .text((n) => n.label.length > 6 ? n.label.slice(0, 5) + '…' : n.label);
-
-      // Full label below circle
       nodeG.append('text').attr('class', 'g-node-label')
-        .attr('text-anchor', 'middle').attr('dy', 36).attr('font-size', 11)
+        .attr('text-anchor', 'middle').attr('dy', NODE_R + 16).attr('font-size', 12)
         .attr('pointer-events', 'none')
         .text((n) => n.label);
 
       simulation.on('tick', () => {
-        link.attr('x1', (e) => e.source.x).attr('y1', (e) => e.source.y)
-            .attr('x2', (e) => e.target.x).attr('y2', (e) => e.target.y);
-        linkLabel.attr('x', (e) => (e.source.x + e.target.x) / 2)
-                 .attr('y', (e) => (e.source.y + e.target.y) / 2 - 5);
+        link.attr('d', makePath);
+        linkHit.attr('d', makePath);
         nodeG.attr('transform', (n) => 'translate(' + n.x + ',' + n.y + ')');
       });
     }
