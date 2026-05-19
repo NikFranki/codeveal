@@ -1,7 +1,12 @@
 import { ModuleAnalysis } from '../analyzer/types';
 
+export interface FeatureGraphFile {
+  path: string;   // relative to module (e.g. "components/grid.tsx")
+  usage: string;  // AI-described purpose
+}
+
 export interface FeatureGraphData {
-  nodes: Array<{ id: string; label: string }>;
+  nodes: Array<{ id: string; label: string; files: FeatureGraphFile[] }>;
   edges: Array<{ from: string; to: string; label: string; source: string }>;
 }
 

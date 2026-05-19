@@ -12,7 +12,6 @@ export class GlimpsePanelManager {
 
   private _panel?: vscode.WebviewPanel;
   private _pendingMessages: ExtensionToWebviewMessage[] = [];
-  private _lastDataMessage: ExtensionToWebviewMessage | null = null;
 
   private constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -89,7 +88,6 @@ export class GlimpsePanelManager {
 
   private _send(message: ExtensionToWebviewMessage): void {
     if (message.type === 'data') {
-      this._lastDataMessage = message;
       const markdown = buildMarkmapMarkdown(message.analysis);
       const graph = buildFeatureGraph(message.analysis);
       this._panel?.webview.postMessage({ ...message, markdown, graph });
@@ -231,12 +229,38 @@ export class GlimpsePanelManager {
     .g-node-label { fill: var(--vscode-foreground, #ccc); pointer-events: none; }
     .g-empty { fill: var(--vscode-descriptionForeground, #888); font-size: 13px; }
 
-    /* ── edge tooltip ── */
+    /* ── graph legend ── */
+    #g-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 7px 10px;
+      background: var(--vscode-editorWidget-background, rgba(30,30,30,0.85));
+      border: 1px solid var(--vscode-widget-border, #444);
+      border-radius: 4px;
+      font-size: 11px;
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .g-legend-arrow {
+      font-family: monospace;
+      color: var(--vscode-foreground, #ccc);
+      letter-spacing: 1px;
+    }
+    .g-legend-text {
+      color: var(--vscode-descriptionForeground, #888);
+    }
+
+    /* ── node / edge tooltip ── */
     #g-tooltip {
       display: none;
       position: absolute;
-      max-width: 220px;
-      padding: 6px 10px;
+      max-width: 280px;
+      padding: 8px 12px;
       background: var(--vscode-editorHoverWidget-background, #252526);
       border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
       color: var(--vscode-editorHoverWidget-foreground, #cccccc);
@@ -245,7 +269,7 @@ export class GlimpsePanelManager {
       box-shadow: 0 2px 8px rgba(0,0,0,0.5);
       pointer-events: none;
       z-index: 20;
-      word-break: break-all;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -285,6 +309,10 @@ export class GlimpsePanelManager {
     <div id="graph-pane" style="display:none;">
       <svg id="graph-svg"></svg>
       <div id="g-tooltip"></div>
+      <div id="g-legend">
+        <span class="g-legend-arrow">A ──→ B</span>
+        <span class="g-legend-text">A 导入了 B（A 依赖 B）</span>
+      </div>
     </div>
   </div>
 
@@ -532,7 +560,7 @@ export class GlimpsePanelManager {
         const rect = graphPane.getBoundingClientRect();
         let x = ev.clientX - rect.left + 14;
         let y = ev.clientY - rect.top  - 10;
-        if (x + 234 > graphPane.clientWidth)  x = ev.clientX - rect.left - 234;
+        if (x + 296 > graphPane.clientWidth)  x = ev.clientX - rect.left - 296;
         if (y + 60   > graphPane.clientHeight) y = ev.clientY - rect.top  - 60;
         tooltip.style.left = x + 'px';
         tooltip.style.top  = y + 'px';
@@ -548,11 +576,12 @@ export class GlimpsePanelManager {
         .on('mouseleave', () => { tooltip.style.display = 'none'; });
 
       // Node groups
+      let nodeDragged = false;
       const nodeG = g.append('g').selectAll('g')
         .data(nodes).join('g').attr('cursor', 'pointer')
         .call(d3.drag()
-          .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+          .on('start', (ev, d) => { nodeDragged = false; if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+          .on('drag',  (ev, d) => { nodeDragged = true; d.fx = ev.x; d.fy = ev.y; })
           .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
       nodeG.append('circle').attr('r', NODE_R)
@@ -564,6 +593,34 @@ export class GlimpsePanelManager {
         .attr('text-anchor', 'middle').attr('dy', NODE_R + 16).attr('font-size', 12)
         .attr('pointer-events', 'none')
         .text((n) => n.label);
+
+      // Node tooltip (show files on hover) + click to open primary file
+      nodeG
+        .on('mouseenter', (ev, n) => {
+          if (!n.files || !n.files.length) return;
+          let html = '<strong style="font-size:12px;">' + n.label + '</strong>'
+                   + '<ul style="margin:6px 0 0 0;padding:0;list-style:none;">';
+          for (const f of n.files) {
+            html += '<li style="padding:4px 0;border-top:1px solid rgba(255,255,255,0.08);">'
+                  + '<span style="font-family:monospace;font-size:10px;opacity:0.7;">' + f.path + '</span>';
+            if (f.usage) {
+              html += '<br><span style="font-size:11px;">' + f.usage + '</span>';
+            }
+            html += '</li>';
+          }
+          html += '</ul><div style="margin-top:6px;font-size:10px;opacity:0.5;">点击打开文件</div>';
+          tooltip.innerHTML = html;
+          tooltip.style.display = 'block';
+          posTooltip(ev);
+        })
+        .on('mousemove', (ev) => { if (tooltip.style.display !== 'none') posTooltip(ev); })
+        .on('mouseleave', () => { tooltip.style.display = 'none'; })
+        .on('click', (ev, n) => {
+          if (nodeDragged) { nodeDragged = false; return; }
+          if (!n.files || !n.files.length) return;
+          const primary = n.files.find((f) => /\.(tsx|vue)$/i.test(f.path)) ?? n.files[0];
+          vscode.postMessage({ type: 'openFile', filePath: currentModulePath + '/' + primary.path });
+        });
 
       simulation.on('tick', () => {
         link.attr('d', makePath);
