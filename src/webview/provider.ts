@@ -263,6 +263,8 @@ export class GlimpsePanelManager {
       display: none;
       position: absolute;
       max-width: 280px;
+      max-height: 360px;
+      overflow-y: auto;
       padding: 8px 12px;
       background: var(--vscode-editorHoverWidget-background, #252526);
       border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
@@ -274,6 +276,22 @@ export class GlimpsePanelManager {
       z-index: 20;
       word-break: break-word;
     }
+    /* ── collapsible tooltip sections (hover to expand) ── */
+    .tip-section { margin-top: 6px; }
+    .tip-section-hd {
+      display: flex; align-items: center;
+      font-size: 10px; opacity: 0.45;
+      cursor: default; user-select: none;
+    }
+    .tip-section-hd::after { content: ' ▶'; font-size: 8px; margin-left: 2px; }
+    .tip-section-bd {
+      overflow: hidden; max-height: 0;
+      opacity: 0;
+      transition: max-height 0.2s ease, opacity 0.15s;
+    }
+    .tip-section:hover .tip-section-bd { max-height: 200px; opacity: 1; }
+    .tip-section:hover .tip-section-hd { opacity: 0.8; }
+    .tip-section:hover .tip-section-hd::after { content: ' ▼'; }
   </style>
 </head>
 <body>
@@ -346,6 +364,19 @@ export class GlimpsePanelManager {
     let graphSimulation = null;
     let graphZoom = null;
     let activeTab = 'mindmap';
+    let nodeHideTimer = null;
+    let expandedDirs = new Set();
+
+    // Tooltip stays open while mouse is inside it (interactive sections)
+    const gTooltipEl = document.getElementById('g-tooltip');
+    gTooltipEl.addEventListener('mouseenter', () => {
+      if (nodeHideTimer) { clearTimeout(nodeHideTimer); nodeHideTimer = null; }
+    });
+    gTooltipEl.addEventListener('mouseleave', () => {
+      gTooltipEl.style.display = 'none';
+      gTooltipEl.style.pointerEvents = 'none';
+      nodeHideTimer = null;
+    });
 
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
     function showOnly(el) {
@@ -462,6 +493,57 @@ export class GlimpsePanelManager {
         ).scale(0.85));
     }
 
+    function computeVisibleGraph(graph) {
+      const foldedSet = new Set(
+        (graph.foldedDirs || []).filter(function(d) { return !expandedDirs.has(d); })
+      );
+      if (!foldedSet.size) {
+        return { nodes: graph.nodes, edges: graph.edges };
+      }
+      const dirCounts = new Map();
+      const dirDepths = new Map();
+      for (const n of graph.nodes) {
+        const d = n.dir;
+        if (d && foldedSet.has(d)) {
+          dirCounts.set(d, (dirCounts.get(d) || 0) + 1);
+          if (!dirDepths.has(d) || n.depth < dirDepths.get(d)) dirDepths.set(d, n.depth);
+        }
+      }
+      const foldedNodeMap = new Map();
+      for (const n of graph.nodes) {
+        if (n.dir && foldedSet.has(n.dir)) foldedNodeMap.set(n.id, 'dir:' + n.dir);
+      }
+      const visibleNodes = [];
+      const seenDirNodes = new Set();
+      for (const n of graph.nodes) {
+        if (foldedNodeMap.has(n.id)) {
+          const dirId = foldedNodeMap.get(n.id);
+          if (!seenDirNodes.has(dirId)) {
+            seenDirNodes.add(dirId);
+            const dir = n.dir;
+            visibleNodes.push({
+              id: dirId, label: dir, path: dir,
+              depth: dirDepths.get(dir) || 0,
+              dir: '', usage: '', state: [], behaviors: [], methods: [],
+              isDir: true, fileCount: dirCounts.get(dir),
+            });
+          }
+        } else {
+          visibleNodes.push(n);
+        }
+      }
+      const edgeKeys = new Set();
+      const visibleEdges = [];
+      for (const e of graph.edges) {
+        const from = foldedNodeMap.get(e.from) || e.from;
+        const to   = foldedNodeMap.get(e.to)   || e.to;
+        if (from === to) continue;
+        const key = from + '\0' + to;
+        if (!edgeKeys.has(key)) { edgeKeys.add(key); visibleEdges.push({ from, to }); }
+      }
+      return { nodes: visibleNodes, edges: visibleEdges };
+    }
+
     function renderGraph(graph) {
       if (graphSimulation) { graphSimulation.stop(); graphSimulation = null; }
 
@@ -481,15 +563,17 @@ export class GlimpsePanelManager {
       const W = svgEl.clientWidth  || document.getElementById('graph-pane').clientWidth  || 800;
       const H = svgEl.clientHeight || document.getElementById('graph-pane').clientHeight || 600;
 
-      // Clone nodes/edges so D3 can mutate freely
-      const nodes = graph.nodes.map((n) => ({ ...n }));
-      const edges = graph.edges.map((e) => ({ ...e, source: e.from, target: e.to }));
+      // Apply directory folding, then clone so D3 can mutate freely
+      const vg = computeVisibleGraph(graph);
+      const nodes = vg.nodes.map((n) => ({ ...n }));
+      const edges = vg.edges.map((e) => ({ ...e, source: e.from, target: e.to }));
 
       const svgSel = d3.select(svgEl);
       const COLORS = d3.schemeTableau10;
       const NODE_R = 24;
-      const ARROW_OFFSET = NODE_R + 4;
+      const DIR_R  = 42;
       const CURVE_OFFSET = 34;
+      function nodeR(n) { return n && n.isDir ? DIR_R : NODE_R; }
 
       // Color nodes by AI feature group (same group = same colour)
       const groups = [...new Set(nodes.map((n) => n.featureGroup).filter(Boolean))];
@@ -504,10 +588,12 @@ export class GlimpsePanelManager {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const x1 = d.source.x + (dx / dist) * ARROW_OFFSET;
-        const y1 = d.source.y + (dy / dist) * ARROW_OFFSET;
-        const x2 = d.target.x - (dx / dist) * ARROW_OFFSET;
-        const y2 = d.target.y - (dy / dist) * ARROW_OFFSET;
+        const r1 = nodeR(d.source) + 4;
+        const r2 = nodeR(d.target) + 4;
+        const x1 = d.source.x + (dx / dist) * r1;
+        const y1 = d.source.y + (dy / dist) * r1;
+        const x2 = d.target.x - (dx / dist) * r2;
+        const y2 = d.target.y - (dy / dist) * r2;
         if (isBidi(d)) {
           const s = bidiSign(d) * CURVE_OFFSET;
           const mx = (x1 + x2) / 2 + s * (-dy / dist);
@@ -545,7 +631,7 @@ export class GlimpsePanelManager {
         .force('charge',    d3.forceManyBody().strength(-500))
         .force('x',         d3.forceX(W / 2).strength(0.04))
         .force('y',         d3.forceY((n) => (n.depth + 0.8) * levelH).strength(0.55))
-        .force('collision', d3.forceCollide(NODE_R + 22));
+        .force('collision', d3.forceCollide((n) => (n.isDir ? DIR_R + 18 : NODE_R + 22)));
       graphSimulation = simulation;
 
       // Edge paths
@@ -566,27 +652,85 @@ export class GlimpsePanelManager {
       const graphPane = document.getElementById('graph-pane');
       const tooltip   = document.getElementById('g-tooltip');
 
-      function posTooltip(ev) {
+      // Edge tooltip: cursor-following, no interaction
+      function posEdgeTooltip(ev) {
         const rect = graphPane.getBoundingClientRect();
         let x = ev.clientX - rect.left + 14;
         let y = ev.clientY - rect.top  - 10;
-        if (x + 300 > graphPane.clientWidth)  x = ev.clientX - rect.left - 300;
-        if (y + 80  > graphPane.clientHeight) y = ev.clientY - rect.top  - 80;
+        if (x + 240 > graphPane.clientWidth)  x = ev.clientX - rect.left - 240;
+        if (y + 40  > graphPane.clientHeight) y = ev.clientY - rect.top  - 40;
         tooltip.style.left = x + 'px';
         tooltip.style.top  = y + 'px';
       }
 
-      // Edge tooltip: just show file names
       linkHit
         .on('mouseenter', (ev, e) => {
+          if (nodeHideTimer) { clearTimeout(nodeHideTimer); nodeHideTimer = null; }
           const fromName = e.from.split('/').pop() ?? e.from;
           const toName   = e.to.split('/').pop()   ?? e.to;
           tooltip.textContent = (isBidi(e) ? '⇄ ' : '') + fromName + ' → ' + toName;
+          tooltip.style.pointerEvents = 'none';
           tooltip.style.display = 'block';
-          posTooltip(ev);
+          posEdgeTooltip(ev);
         })
-        .on('mousemove',  (ev) => posTooltip(ev))
+        .on('mousemove',  (ev) => posEdgeTooltip(ev))
         .on('mouseleave', ()  => { tooltip.style.display = 'none'; });
+
+      // Node tooltip: anchored to node, interactive (sections expand on hover)
+      function posNodeTooltip(n) {
+        const t = d3.zoomTransform(svgEl);
+        const px = t.applyX(n.x);
+        const py = t.applyY(n.y);
+        const TW = 284;
+        const nr = nodeR(n);
+        let tx = px + nr + 8;
+        if (tx + TW > graphPane.clientWidth) tx = Math.max(4, px - TW - nr - 8);
+        let ty = py - 24;
+        if (ty < 4) ty = 4;
+        if (ty + 240 > graphPane.clientHeight) ty = Math.max(4, graphPane.clientHeight - 240);
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top  = ty + 'px';
+      }
+
+      function buildNodeHTML(n) {
+        if (n.isDir) {
+          return '<strong style="font-size:12px;">📁 ' + n.label + '/</strong>'
+            + '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.fileCount + ' 个文件</div>'
+            + '<div style="margin-top:8px;font-size:10px;opacity:0.4;">点击展开目录</div>';
+        }
+        let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
+        if (n.usage) {
+          html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
+        }
+        if (n.state && n.state.length) {
+          html += '<div class="tip-section">'
+                + '<div class="tip-section-hd">状态</div>'
+                + '<div class="tip-section-bd">'
+                + '<div style="font-family:monospace;font-size:10px;padding-top:3px;">'
+                + n.state.join(' · ')
+                + '</div></div></div>';
+        }
+        if (n.behaviors && n.behaviors.length) {
+          html += '<div class="tip-section"><div class="tip-section-hd">交互流转</div>'
+                + '<div class="tip-section-bd">';
+          for (const b of n.behaviors) {
+            html += '<div style="font-size:11px;padding:2px 0 2px 6px;margin-top:2px;'
+                  + 'border-left:2px solid rgba(255,255,255,0.12);">→ ' + b + '</div>';
+          }
+          html += '</div></div>';
+        }
+        if (n.methods && n.methods.length) {
+          html += '<div class="tip-section"><div class="tip-section-hd">方法</div>'
+                + '<div class="tip-section-bd">'
+                + '<div style="font-family:monospace;font-size:10px;padding-top:3px;">'
+                + n.methods.slice(0, 6).join(' · ')
+                + (n.methods.length > 6 ? ' …' : '')
+                + '</div></div></div>';
+        }
+        const hint = (n.methods && n.methods.length) ? '点击跳转到方法' : '点击打开文件';
+        html += '<div style="margin-top:8px;font-size:10px;opacity:0.4;">' + hint + '</div>';
+        return html;
+      }
 
       // ── Node groups ────────────────────────────────────────────
       let nodeDragged = false;
@@ -597,52 +741,58 @@ export class GlimpsePanelManager {
           .on('drag',  (ev, d) => { nodeDragged = true;  d.fx = ev.x; d.fy = ev.y; })
           .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
-      nodeG.append('circle').attr('r', NODE_R)
-        .attr('fill', (n) => groupColor.get(n.featureGroup) ?? '#6c7a8a')
-        .attr('fill-opacity', 0.9)
-        .attr('stroke', 'var(--vscode-editor-background, #1e1e1e)').attr('stroke-width', 2);
+      nodeG.each(function(n) {
+        const sel = d3.select(this);
+        if (n.isDir) {
+          const rw = 80, rh = 28;
+          sel.append('rect')
+            .attr('x', -rw / 2).attr('y', -rh / 2)
+            .attr('width', rw).attr('height', rh).attr('rx', 5)
+            .attr('fill', '#243447').attr('fill-opacity', 0.92)
+            .attr('stroke', 'var(--vscode-foreground, #ccc)')
+            .attr('stroke-width', 1.5).attr('stroke-dasharray', '5,3');
+          sel.append('text')
+            .attr('text-anchor', 'middle').attr('dy', 5).attr('font-size', 11)
+            .attr('fill', 'var(--vscode-foreground, #ccc)').attr('pointer-events', 'none')
+            .text('📁 ' + n.label);
+          sel.append('text').attr('class', 'g-node-label')
+            .attr('text-anchor', 'middle').attr('dy', rh / 2 + 14).attr('font-size', 10)
+            .attr('pointer-events', 'none')
+            .text(n.fileCount + ' 个文件 · 点击展开');
+        } else {
+          sel.append('circle').attr('r', NODE_R)
+            .attr('fill', groupColor.get(n.featureGroup) ?? '#6c7a8a')
+            .attr('fill-opacity', 0.9)
+            .attr('stroke', 'var(--vscode-editor-background, #1e1e1e)').attr('stroke-width', 2);
+          sel.append('text').attr('class', 'g-node-label')
+            .attr('text-anchor', 'middle').attr('dy', NODE_R + 15).attr('font-size', 11)
+            .attr('pointer-events', 'none')
+            .text(n.label);
+        }
+      });
 
-      nodeG.append('text').attr('class', 'g-node-label')
-        .attr('text-anchor', 'middle').attr('dy', NODE_R + 15).attr('font-size', 11)
-        .attr('pointer-events', 'none')
-        .text((n) => n.label);
-
-      // Node tooltip: usage + state + behaviors + methods
       nodeG
         .on('mouseenter', (ev, n) => {
-          let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
-          if (n.usage) {
-            html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
-          }
-          if (n.state && n.state.length) {
-            html += '<div style="margin-top:8px;">'
-                  + '<span style="font-size:10px;opacity:0.5;">状态  </span>'
-                  + '<span style="font-family:monospace;font-size:10px;">' + n.state.join(' · ') + '</span>'
-                  + '</div>';
-          }
-          if (n.behaviors && n.behaviors.length) {
-            html += '<div style="margin-top:8px;font-size:10px;opacity:0.5;">交互流转</div>';
-            for (const b of n.behaviors) {
-              html += '<div style="font-size:11px;padding:1px 0 1px 4px;border-left:2px solid rgba(255,255,255,0.15);">→ ' + b + '</div>';
-            }
-          }
-          if (n.methods && n.methods.length) {
-            html += '<div style="margin-top:8px;">'
-                  + '<span style="font-size:10px;opacity:0.5;">方法  </span>'
-                  + '<span style="font-family:monospace;font-size:10px;">'
-                  + n.methods.slice(0, 4).join('  ·  ')
-                  + (n.methods.length > 4 ? '  …' : '') + '</span></div>';
-          }
-          const hint = (n.methods && n.methods.length) ? '点击跳转到方法' : '点击打开文件';
-          html += '<div style="margin-top:8px;font-size:10px;opacity:0.4;">' + hint + '</div>';
-          tooltip.innerHTML = html;
+          if (nodeHideTimer) { clearTimeout(nodeHideTimer); nodeHideTimer = null; }
+          tooltip.innerHTML = buildNodeHTML(n);
+          tooltip.style.pointerEvents = 'auto';
           tooltip.style.display = 'block';
-          posTooltip(ev);
+          posNodeTooltip(n);
         })
-        .on('mousemove',  (ev) => { if (tooltip.style.display !== 'none') posTooltip(ev); })
-        .on('mouseleave', ()  => { tooltip.style.display = 'none'; })
+        .on('mouseleave', () => {
+          nodeHideTimer = setTimeout(() => {
+            tooltip.style.display = 'none';
+            tooltip.style.pointerEvents = 'none';
+            nodeHideTimer = null;
+          }, 150);
+        })
         .on('click', (ev, n) => {
           if (nodeDragged) { nodeDragged = false; return; }
+          if (n.isDir) {
+            expandedDirs.add(n.path);
+            renderGraph(currentGraph);
+            return;
+          }
           const absPath = currentModulePath + '/' + n.path;
           const firstMethod = n.methods && n.methods[0];
           if (firstMethod) {
@@ -784,6 +934,7 @@ export class GlimpsePanelManager {
       if (msg.type === 'data') {
         finalizeSteps();
         currentGraph = msg.graph || null;
+        expandedDirs = new Set();
         // Reset to mindmap tab on new analysis
         activeTab = 'mindmap';
         document.getElementById('mindmap-pane').style.display = 'flex';
@@ -794,7 +945,7 @@ export class GlimpsePanelManager {
         showOnly(stateMindmap);
         try {
           await renderMindmap(msg.markdown);
-          vscode.setState({ markdown: msg.markdown, graph: msg.graph, modulePath: currentModulePath });
+          vscode.setState({ markdown: msg.markdown, graph: msg.graph, modulePath: currentModulePath, expandedDirs: [...expandedDirs] });
         } catch (err) {
           showOnly(stateError);
           stateError.textContent = '渲染失败: ' + (err && err.message || String(err));
@@ -806,6 +957,7 @@ export class GlimpsePanelManager {
     if (saved && saved.markdown) {
       currentModulePath = saved.modulePath || '';
       currentGraph = saved.graph || null;
+      expandedDirs = new Set(saved.expandedDirs || []);
       showOnly(stateMindmap);
       renderMindmap(saved.markdown).catch((err) => {
         showOnly(stateError);

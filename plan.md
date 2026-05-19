@@ -186,19 +186,19 @@ ui/mindmap.ts → markmap 渲染四维度节点
   - 拓扑排序分配每个文件的深度（depth），有环时 BFS 近似处理
   - `d3.forceY` 按 depth 分层（纵向有层次），`d3.forceX` 自由浮动（横向自然散开）
   - 有循环依赖的节点停在妥协位置，不报错
-- [ ] **7.2.3** Tooltip 升级为交互式 popover
+- [x] **7.2.3** Tooltip 升级为交互式 popover
   - `pointer-events: auto`，支持鼠标移入 tooltip
   - 离开节点后延迟 150ms 隐藏，移入 tooltip 取消隐藏
   - 内部分区折叠：**状态**、**交互流转**（behaviors）默认折叠，hover 展开
   - 数据来源：透传 `state`、`behaviors`、`jsx` 到 `FeatureGraphFile`
-- [ ] **7.2.4** 大模块处理（文件数 > 15）
+- [x] **7.2.4** 大模块处理（文件数 > 15）
   - 按目录分组，超出阈值时目录折叠为单个节点
   - 点击折叠节点展开子图（钻取）
 
 #### 7.3 待讨论
 
-- [ ] 文件节点颜色：同功能域文件用同色（保留语义分组的视觉提示）
-- [ ] 边的 label：默认不显示，hover 时在 tooltip 里展示（避免图面文字过多）
+- [x] 文件节点颜色：同功能域文件用同色（featureGroup → groupColor，已在 7.2.1 实现）
+- [x] 边的 label：默认不显示，hover 时在 edge tooltip 里展示文件名（已在 7.2.3 实现）
 
 ---
 

@@ -50,6 +50,7 @@ export function buildFeatureGraph(analysis: ModuleAnalysis): FeatureGraphData {
       label: shortLabel(f.relativePath),
       path: f.relativePath,
       depth: depths.get(id) ?? 0,
+      dir: getDir(f.relativePath),
       usage: ai?.usage ?? '',
       state: ai?.state ?? [],
       behaviors: ai?.behaviors ?? [],
@@ -59,7 +60,21 @@ export function buildFeatureGraph(analysis: ModuleAnalysis): FeatureGraphData {
     };
   });
 
-  return { nodes, edges };
+  // Fold subdirectories when total file count exceeds threshold
+  const FOLD_THRESHOLD = 15;
+  let foldedDirs: string[] = [];
+  if (files.length > FOLD_THRESHOLD) {
+    const dirCounts = new Map<string, number>();
+    for (const f of files) {
+      const d = getDir(f.relativePath);
+      if (d) dirCounts.set(d, (dirCounts.get(d) ?? 0) + 1);
+    }
+    foldedDirs = [...dirCounts.entries()]
+      .filter(([, count]) => count >= 2)
+      .map(([dir]) => dir);
+  }
+
+  return { nodes, edges, foldedDirs };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -156,6 +171,12 @@ function shortLabel(relPath: string): string {
     return parts.length >= 2 ? parts[parts.length - 2] : noExt;
   }
   return noExt;
+}
+
+function getDir(relPath: string): string {
+  const p = relPath.replace(/\\/g, '/');
+  const idx = p.indexOf('/');
+  return idx === -1 ? '' : p.slice(0, idx);
 }
 
 function norm(p: string): string {

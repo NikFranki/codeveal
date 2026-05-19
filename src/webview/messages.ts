@@ -5,6 +5,7 @@ export interface FeatureGraphNode {
   label: string;         // short display name (basename without ext)
   path: string;          // relative file path
   depth: number;         // 0 = entry, higher = deeper dependency
+  dir: string;           // first path segment ("components"), or "" for root files
   usage: string;
   state: string[];
   behaviors: string[];
@@ -16,6 +17,7 @@ export interface FeatureGraphNode {
 export interface FeatureGraphData {
   nodes: FeatureGraphNode[];
   edges: Array<{ from: string; to: string }>;
+  foldedDirs: string[];  // dirs initially collapsed when file count > threshold
 }
 
 // Extension → Webview
