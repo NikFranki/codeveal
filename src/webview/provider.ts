@@ -176,6 +176,14 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── fullscreen overlay ── */
+    #state-mindmap.fullscreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--vscode-sideBar-background);
+    }
+
     /* ── mindmap svg ── */
     #mindmap {
       width: 100%; height: 100%;
@@ -207,9 +215,10 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
   <div id="state-mindmap">
     <div id="toolbar">
-      <button class="tb-btn" id="btn-fit"      title="适应屏幕">⊡</button>
-      <button class="tb-btn" id="btn-zoom-in"  title="放大">＋</button>
-      <button class="tb-btn" id="btn-zoom-out" title="缩小">－</button>
+      <button class="tb-btn" id="btn-fullscreen" title="全屏">⛶</button>
+      <button class="tb-btn" id="btn-fit"        title="适应屏幕">⊡</button>
+      <button class="tb-btn" id="btn-zoom-in"    title="放大">＋</button>
+      <button class="tb-btn" id="btn-zoom-out"   title="缩小">－</button>
       <div class="tb-sep"></div>
       <button class="tb-btn" id="btn-export-svg" title="导出 SVG" style="font-size:9px;">SVG</button>
       <button class="tb-btn" id="btn-export-png" title="导出 PNG" style="font-size:9px;">PNG</button>
@@ -255,6 +264,31 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     });
 
     // ── toolbar ────────────────────────────────────────────────
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    btnFullscreen.addEventListener('click', () => {
+      const entering = stateMindmap.classList.toggle('fullscreen');
+      btnFullscreen.textContent = entering ? '✕' : '⛶';
+      btnFullscreen.title = entering ? '退出全屏' : '全屏';
+      setTimeout(() => mm?.fit(), 60);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && stateMindmap.classList.contains('fullscreen')) {
+        stateMindmap.classList.remove('fullscreen');
+        btnFullscreen.textContent = '⛶';
+        btnFullscreen.title = '全屏';
+        setTimeout(() => mm?.fit(), 60);
+      }
+    });
+
+    // Cmd/Ctrl + wheel → zoom
+    stateMindmap.addEventListener('wheel', (e) => {
+      if (!mm || (!e.metaKey && !e.ctrlKey)) return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      mm.zoom.scaleBy(mm.svg, factor);
+    }, { passive: false });
+
     document.getElementById('btn-fit').addEventListener('click', () => mm?.fit());
 
     document.getElementById('btn-zoom-in').addEventListener('click', () => {
