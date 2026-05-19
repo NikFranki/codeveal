@@ -232,7 +232,7 @@ export class GlimpsePanelManager {
     /* ── graph legend ── */
     #g-legend {
       position: absolute;
-      bottom: 12px;
+      top: 12px;
       left: 12px;
       display: flex;
       flex-direction: column;
