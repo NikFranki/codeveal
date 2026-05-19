@@ -161,6 +161,45 @@ ui/mindmap.ts → markmap 渲染四维度节点
 - [ ] **6.2** MF 跨 app 依赖在思维导图中单独分组展示
 - [ ] **6.3** 节点下钻（点击子文件夹触发下一层分析）
 
+### Phase 7 — 功能关系图（Feature Graph）
+
+> 目标：在现有思维导图旁新增"功能关系图"tab，用有向图展示文件间依赖关系。
+
+#### 7.1 已完成
+
+- [x] 类型扩展：`FeatureRelation`、`AIRawOutputRelation`、`FeatureGraphData`
+- [x] 静态推断：`inferFeatureRelations`（跨功能域 import 追踪 + AI 语义合并）
+- [x] AI 提示词：扩展 `featureRelations[]` schema + 解析
+- [x] Webview：D3 force-directed 图、双向弧线、箭头、自定义 HTML tooltip
+- [x] Tab 切换：思维导图 / 功能关系图
+- [x] 节点 tooltip：显示文件列表 + 用途 + 方法名
+- [x] 节点点击：跳转到对应文件或方法（`openFileAtSymbol`）
+- [x] 图例：左上角说明箭头语义（A→B 表示 A 导入了 B）
+
+#### 7.2 待实现（文件节点重构）
+
+- [ ] **7.2.1** 节点模型切换：从"功能域节点"改为"文件节点"
+  - 节点 = 一个文件，边 = 真实 import 关系（静态分析，100% 准确）
+  - AI 角色变为"为每个节点写注释"而非"划分节点"
+  - 过滤规则：隐藏 `*.d.ts`、纯 type 文件；默认隐藏 `constants/utils/helpers`（可切换）
+- [ ] **7.2.2** 布局升级：混合 force-DAG
+  - 拓扑排序分配每个文件的深度（depth），有环时 BFS 近似处理
+  - `d3.forceY` 按 depth 分层（纵向有层次），`d3.forceX` 自由浮动（横向自然散开）
+  - 有循环依赖的节点停在妥协位置，不报错
+- [ ] **7.2.3** Tooltip 升级为交互式 popover
+  - `pointer-events: auto`，支持鼠标移入 tooltip
+  - 离开节点后延迟 150ms 隐藏，移入 tooltip 取消隐藏
+  - 内部分区折叠：**状态**、**交互流转**（behaviors）默认折叠，hover 展开
+  - 数据来源：透传 `state`、`behaviors`、`jsx` 到 `FeatureGraphFile`
+- [ ] **7.2.4** 大模块处理（文件数 > 15）
+  - 按目录分组，超出阈值时目录折叠为单个节点
+  - 点击折叠节点展开子图（钻取）
+
+#### 7.3 待讨论
+
+- [ ] 文件节点颜色：同功能域文件用同色（保留语义分组的视觉提示）
+- [ ] 边的 label：默认不显示，hover 时在 tooltip 里展示（避免图面文字过多）
+
 ---
 
 ## 关键决策记录
@@ -172,6 +211,9 @@ ui/mindmap.ts → markmap 渲染四维度节点
 | AI 调用方式 | 子进程调用订阅制 CLI | 不暴露 API Key，用户用自己的订阅 |
 | MF 依赖识别 | 静态读 webpack config | 运行时识别太重，静态够用 |
 | Vue 解析 | vue-template-compiler + script 提取 | 官方工具链，稳定 |
+| 关系图节点粒度 | 文件节点（非功能域节点）| 功能域节点导致多节点指向同一文件、点击跳转不准；文件节点语义明确，一节点对应一文件 |
+| 关系图布局 | 混合 force-DAG | 纯 force-directed 节点多时混乱无方向感；纯 DAG 遇到循环依赖会崩；混合方案用拓扑排序分配 y 层级 + D3 force 处理 x 方向，有环时自然妥协不报错 |
+| 关系图 tooltip | 交互式 popover（非穿透 tooltip）| 需要支持 hover 内部区块展开详情；改为 pointer-events:auto + 离开延迟隐藏 |
 
 ---
 
