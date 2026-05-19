@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { GlimpseViewProvider } from '../webview/provider';
+import { GlimpsePanelManager } from '../webview/provider';
 import { analyzeModule } from '../analyzer/index';
 import { detectSkill } from '../ai/detector';
 import { buildPrompt, parseAIOutput } from '../ai/prompt-builder';
@@ -18,7 +18,7 @@ function staticFallback(skeleton: ModuleSkeleton, reason?: string): ModuleAnalys
 }
 
 export async function analyzeModuleCommand(
-  provider: GlimpseViewProvider,
+  provider: GlimpsePanelManager,
   uri: vscode.Uri
 ): Promise<void> {
   await provider.focusView();

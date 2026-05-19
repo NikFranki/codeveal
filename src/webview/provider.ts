@@ -2,26 +2,47 @@ import * as vscode from 'vscode';
 import { ExtensionToWebviewMessage, WebviewToExtensionMessage } from './messages';
 import { buildMarkmapMarkdown } from './ui/mindmap';
 
-export class GlimpseViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewId = 'glimpse.moduleView';
+/**
+ * Manages a singleton WebviewPanel in the main editor area.
+ * Replaces the old sidebar WebviewView to give the mindmap full screen space.
+ */
+export class GlimpsePanelManager {
+  private static _instance?: GlimpsePanelManager;
 
-  private _view?: vscode.WebviewView;
+  private _panel?: vscode.WebviewPanel;
   private _pendingMessages: ExtensionToWebviewMessage[] = [];
   private _lastDataMessage: ExtensionToWebviewMessage | null = null;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  private constructor(private readonly _extensionUri: vscode.Uri) {}
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
-    this._view = webviewView;
+  static getInstance(extensionUri: vscode.Uri): GlimpsePanelManager {
+    if (!GlimpsePanelManager._instance) {
+      GlimpsePanelManager._instance = new GlimpsePanelManager(extensionUri);
+    }
+    return GlimpsePanelManager._instance;
+  }
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this._extensionUri],
-    };
+  /** Create the panel (or reveal it if already open). */
+  show(): void {
+    if (this._panel) {
+      this._panel.reveal(vscode.ViewColumn.Beside, true);
+      return;
+    }
 
-    webviewView.webview.html = this._getHtml();
+    this._panel = vscode.window.createWebviewPanel(
+      'glimpse.mindmap',
+      'Glimpse',
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [this._extensionUri],
+      }
+    );
 
-    webviewView.webview.onDidReceiveMessage((msg: WebviewToExtensionMessage) => {
+    this._panel.webview.html = this._getHtml();
+
+    this._panel.webview.onDidReceiveMessage((msg: WebviewToExtensionMessage) => {
       switch (msg.type) {
         case 'openFile':
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.filePath));
@@ -38,40 +59,40 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
             vscode.Uri.file(msg.folderPath)
           );
           break;
+
       }
     });
 
-    if (this._pendingMessages.length > 0) {
-      for (const msg of this._pendingMessages) {
-        this._send(msg);
-      }
-      this._pendingMessages = [];
-    } else if (this._lastDataMessage) {
-      // Restore last result when panel is re-opened after being collapsed.
-      this._send(this._lastDataMessage);
+    this._panel.onDidDispose(() => {
+      this._panel = undefined;
+    });
+
+    for (const msg of this._pendingMessages) {
+      this._send(msg);
     }
+    this._pendingMessages = [];
   }
 
   postMessage(message: ExtensionToWebviewMessage): void {
-    if (this._view) {
+    if (this._panel) {
       this._send(message);
     } else {
       this._pendingMessages.push(message);
     }
   }
 
-  focusView(): Thenable<unknown> {
-    return vscode.commands.executeCommand(`${GlimpseViewProvider.viewId}.focus`);
+  focusView(): Thenable<void> {
+    this.show();
+    return Promise.resolve();
   }
 
-  /** Enrich data messages with pre-built markdown before forwarding to the webview. */
   private _send(message: ExtensionToWebviewMessage): void {
     if (message.type === 'data') {
       this._lastDataMessage = message;
       const markdown = buildMarkmapMarkdown(message.analysis);
-      this._view?.webview.postMessage({ ...message, markdown });
+      this._panel?.webview.postMessage({ ...message, markdown });
     } else {
-      this._view?.webview.postMessage(message);
+      this._panel?.webview.postMessage(message);
     }
   }
 
@@ -98,7 +119,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
+      background: var(--vscode-editor-background);
     }
 
     /* ── states ── */
@@ -176,19 +197,10 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── fullscreen overlay ── */
-    #state-mindmap.fullscreen {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      background: var(--vscode-sideBar-background);
-    }
-
     /* ── mindmap svg ── */
     #mindmap {
       width: 100%; height: 100%;
     }
-    /* markmap node text — force visible against dark backgrounds */
     .markmap-foreign { color: var(--vscode-foreground, #cccccc); }
     .markmap-foreign a { color: var(--vscode-textLink-foreground); text-decoration: none; }
     .markmap-foreign a:hover { text-decoration: underline; }
@@ -215,8 +227,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
   <div id="state-mindmap">
     <div id="toolbar">
-      <button class="tb-btn" id="btn-fullscreen" title="全屏">⛶</button>
-      <button class="tb-btn" id="btn-fit"        title="适应屏幕">⊡</button>
+      <button class="tb-btn" id="btn-fit" title="适应屏幕">⊡</button>
       <button class="tb-btn" id="btn-zoom-in"    title="放大">＋</button>
       <button class="tb-btn" id="btn-zoom-out"   title="缩小">－</button>
       <div class="tb-sep"></div>
@@ -226,7 +237,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     <svg id="mindmap"></svg>
   </div>
 
-  <!-- markmap autoloader: bundles d3 + markmap-lib + markmap-view -->
   <script nonce="${nonce}"
     src="https://cdn.jsdelivr.net/npm/markmap-autoloader@0.17"></script>
 
@@ -243,20 +253,18 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     const retryBtn      = document.getElementById('retry-btn');
     const svgEl         = document.getElementById('mindmap');
 
-    let mm = null;               // Markmap instance
-    let currentModulePath = '';  // last analyzed folder, used by retry
-    let activeStepEl = null;     // current in-progress step row
+    let mm = null;
+    let currentModulePath = '';
+    let activeStepEl = null;
     let stepTimerInterval = null;
     let stepStartTime = 0;
 
-    // ── flex containers need display:flex, others display:block ──
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
     function showOnly(el) {
       FLEX_STATES.forEach(e => { e.style.display = 'none'; });
       el.style.display = 'flex';
     }
 
-    // ── retry button ───────────────────────────────────────────
     retryBtn.addEventListener('click', () => {
       if (currentModulePath) {
         vscode.postMessage({ type: 'drillDown', folderPath: currentModulePath });
@@ -264,23 +272,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     });
 
     // ── toolbar ────────────────────────────────────────────────
-    const btnFullscreen = document.getElementById('btn-fullscreen');
-    btnFullscreen.addEventListener('click', () => {
-      const entering = stateMindmap.classList.toggle('fullscreen');
-      btnFullscreen.textContent = entering ? '✕' : '⛶';
-      btnFullscreen.title = entering ? '退出全屏' : '全屏';
-      setTimeout(() => mm?.fit(), 60);
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && stateMindmap.classList.contains('fullscreen')) {
-        stateMindmap.classList.remove('fullscreen');
-        btnFullscreen.textContent = '⛶';
-        btnFullscreen.title = '全屏';
-        setTimeout(() => mm?.fit(), 60);
-      }
-    });
-
     // Cmd/Ctrl + wheel → zoom
     stateMindmap.addEventListener('wheel', (e) => {
       if (!mm || (!e.metaKey && !e.ctrlKey)) return;
@@ -304,7 +295,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('btn-export-svg').addEventListener('click', () => {
       if (!svgEl) return;
       const name = currentModulePath.split('/').filter(Boolean).pop() || 'mindmap';
-      // Clone SVG and embed minimal style so the exported file is self-contained
       const clone = svgEl.cloneNode(true);
       const bbox = svgEl.getBBox ? svgEl.getBBox() : { width: svgEl.clientWidth, height: svgEl.clientHeight, x: 0, y: 0 };
       clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -331,7 +321,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const scale = 2; // retina
+        const scale = 2;
         canvas.width = w * scale;
         canvas.height = h * scale;
         const ctx = canvas.getContext('2d');
@@ -340,7 +330,7 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
         ctx.fillRect(0, 0, w, h);
         try {
           ctx.drawImage(img, 0, 0, w, h);
-        } catch (_) { /* cross-origin taint — skip background draw */ }
+        } catch (_) { /* cross-origin taint */ }
         const a = document.createElement('a');
         a.href = canvas.toDataURL('image/png');
         a.download = name + '-mindmap.png';
@@ -361,17 +351,11 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
     }
 
     async function renderMindmap(markdown) {
-      // markmap-autoloader registers window.markmap with Transformer + Markmap
       await waitForMarkmap();
       const { Transformer, Markmap } = window.markmap;
       const transformer = new Transformer();
       const { root } = transformer.transform(markdown);
-
-      // Fold file-level nodes (depth >= 3) by default so Props/State/方法 are
-      // collapsed until the user clicks to expand. Depth 0 = root, 1 = sections
-      // (模块职责…), 2 = feature/group, 3 = file nodes inside data flow.
       foldAtDepth(root, 0);
-
       if (!mm) {
         mm = Markmap.create(svgEl, { zoom: true, pan: true });
       }
@@ -388,9 +372,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // ── node click → open file ─────────────────────────────
-    // Use capture phase so we intercept before the webview's default link
-    // navigation swallows the unknown "glimpse-file:" scheme silently.
     document.addEventListener('click', (e) => {
       const a = e.target.closest('a');
       if (!a) return;
@@ -420,7 +401,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
 
     function addStep(text) {
       clearStepTimer();
-      // Mark previous active step as done (keep its elapsed time)
       if (activeStepEl) {
         activeStepEl.classList.remove('step-active');
         activeStepEl.classList.add('step-done');
@@ -454,7 +434,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // ── messages from extension ────────────────────────────
     window.addEventListener('message', async (event) => {
       const msg = event.data;
 
@@ -495,7 +474,6 @@ export class GlimpseViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
-    // ── restore state after panel close/reopen ─────────────
     const saved = vscode.getState();
     if (saved && saved.markdown) {
       currentModulePath = saved.modulePath || '';

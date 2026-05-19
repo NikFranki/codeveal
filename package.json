@@ -9,8 +9,7 @@
   },
   "categories": ["Other"],
   "activationEvents": [
-    "onCommand:glimpse.analyzeModule",
-    "onView:glimpse.moduleView"
+    "onCommand:glimpse.analyzeModule"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -31,15 +30,6 @@
           "command": "glimpse.analyzeModule",
           "when": "!explorerResourceIsFolder && resourceExtname =~ /\\.(ts|tsx|vue|js)$/",
           "group": "navigation"
-        }
-      ]
-    },
-    "views": {
-      "explorer": [
-        {
-          "type": "webview",
-          "id": "glimpse.moduleView",
-          "name": "Glimpse 模块视图"
         }
       ]
     },
