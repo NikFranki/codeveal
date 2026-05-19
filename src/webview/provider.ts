@@ -714,9 +714,15 @@ export class GlimpsePanelManager {
       linkHit
         .on('mouseenter', (ev, e) => {
           if (nodeHideTimer) { clearTimeout(nodeHideTimer); nodeHideTimer = null; }
-          const fromName = e.from.split('/').pop() ?? e.from;
-          const toName   = e.to.split('/').pop()   ?? e.to;
-          tooltip.textContent = (isBidi(e) ? '⇄ ' : '') + fromName + ' → ' + toName;
+          const fmt = (id) => id.startsWith('dir:') ? id.slice(4) + '/' : id;
+          const fromPath = fmt(e.from);
+          const toPath   = fmt(e.to);
+          tooltip.innerHTML =
+            '<div style="font-size:10px;opacity:0.5;margin-bottom:4px;">'
+            + (isBidi(e) ? '⇄ 双向依赖' : '导入关系') + '</div>'
+            + '<code style="font-size:10px;word-break:break-all;">' + fromPath + '</code>'
+            + '<div style="font-size:11px;padding:3px 0 2px;opacity:0.6;">→ 被导入到</div>'
+            + '<code style="font-size:10px;word-break:break-all;">' + toPath + '</code>';
           tooltip.style.pointerEvents = 'none';
           tooltip.style.display = 'block';
           posEdgeTooltip(ev);
