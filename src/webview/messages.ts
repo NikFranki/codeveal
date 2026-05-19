@@ -1,14 +1,21 @@
 import { ModuleAnalysis } from '../analyzer/types';
 
-export interface FeatureGraphFile {
-  path: string;      // relative to module (e.g. "components/grid.tsx")
-  usage: string;     // AI-described purpose
-  methods?: string[]; // function/method names in this file for this feature
+export interface FeatureGraphNode {
+  id: string;            // relative file path (unique key)
+  label: string;         // short display name (basename without ext)
+  path: string;          // relative file path
+  depth: number;         // 0 = entry, higher = deeper dependency
+  usage: string;
+  state: string[];
+  behaviors: string[];
+  methods: string[];
+  jsx?: string;
+  featureGroup?: string; // AI feature domain (used for color grouping)
 }
 
 export interface FeatureGraphData {
-  nodes: Array<{ id: string; label: string; files: FeatureGraphFile[] }>;
-  edges: Array<{ from: string; to: string; label: string; source: string }>;
+  nodes: FeatureGraphNode[];
+  edges: Array<{ from: string; to: string }>;
 }
 
 // Extension → Webview

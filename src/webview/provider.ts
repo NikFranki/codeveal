@@ -473,7 +473,7 @@ export class GlimpsePanelManager {
         t.setAttribute('x', '50%'); t.setAttribute('y', '50%');
         t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'middle');
         t.setAttribute('class', 'g-empty');
-        t.textContent = '未检测到功能关联关系';
+        t.textContent = '未检测到文件依赖关系';
         svgEl.appendChild(t);
         return;
       }
@@ -481,27 +481,29 @@ export class GlimpsePanelManager {
       const W = svgEl.clientWidth  || document.getElementById('graph-pane').clientWidth  || 800;
       const H = svgEl.clientHeight || document.getElementById('graph-pane').clientHeight || 600;
 
+      // Clone nodes/edges so D3 can mutate freely
       const nodes = graph.nodes.map((n) => ({ ...n }));
       const edges = graph.edges.map((e) => ({ ...e, source: e.from, target: e.to }));
 
       const svgSel = d3.select(svgEl);
       const COLORS = d3.schemeTableau10;
-      const NODE_R = 26;  // circle radius
-      const ARROW_OFFSET = NODE_R + 4;  // line endpoint stops here from node center
+      const NODE_R = 24;
+      const ARROW_OFFSET = NODE_R + 4;
+      const CURVE_OFFSET = 34;
 
-      // Detect bidirectional pairs: A→B + B→A on the same chord
+      // Color nodes by AI feature group (same group = same colour)
+      const groups = [...new Set(nodes.map((n) => n.featureGroup).filter(Boolean))];
+      const groupColor = new Map(groups.map((g, i) => [g, COLORS[i % COLORS.length]]));
+
+      // Bidirectional edge detection
       const reverseSet = new Set(edges.map((e) => e.to + '\0' + e.from));
       function isBidi(e) { return reverseSet.has(e.from + '\0' + e.to); }
-      // Consistent curve sign so both A→B and B→A arc to the same spatial side
       function bidiSign(e) { return e.from <= e.to ? 1 : -1; }
-      const CURVE_OFFSET = 36; // px, how far the arc bows out
 
-      // Build SVG path string: straight for one-way, quadratic arc for two-way
       function makePath(d) {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        // Clip endpoints to circle edge so arrow sits at the rim
         const x1 = d.source.x + (dx / dist) * ARROW_OFFSET;
         const y1 = d.source.y + (dy / dist) * ARROW_OFFSET;
         const x2 = d.target.x - (dx / dist) * ARROW_OFFSET;
@@ -515,7 +517,7 @@ export class GlimpsePanelManager {
         return 'M' + x1 + ',' + y1 + 'L' + x2 + ',' + y2;
       }
 
-      // Arrow marker — refX=10 puts the tip exactly at the path endpoint
+      // Arrow marker
       svgSel.append('defs').append('marker')
         .attr('id', 'g-arrow').attr('viewBox', '0 -5 10 10')
         .attr('refX', 10).attr('refY', 0)
@@ -527,35 +529,40 @@ export class GlimpsePanelManager {
       const g = svgSel.append('g');
 
       // Zoom
-      const zoom = d3.zoom().scaleExtent([0.15, 4])
+      const zoom = d3.zoom().scaleExtent([0.1, 4])
         .on('zoom', (ev) => g.attr('transform', ev.transform));
       graphZoom = zoom;
       svgSel.call(zoom);
 
-      // Force simulation
+      // ── Hybrid force-DAG layout ────────────────────────────────
+      // Strong forceY pulls each node to its topo depth level;
+      // gentle forceX keeps the graph horizontally centred.
+      const maxDepth = Math.max(...nodes.map((n) => n.depth), 0) || 1;
+      const levelH   = (H * 0.78) / (maxDepth + 1);
+
       const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(edges).id((n) => n.id).distance(280))
-        .force('charge', d3.forceManyBody().strength(-900))
-        .force('center', d3.forceCenter(W / 2, H / 2))
-        .force('collision', d3.forceCollide(80));
+        .force('link',      d3.forceLink(edges).id((n) => n.id).distance(180).strength(0.25))
+        .force('charge',    d3.forceManyBody().strength(-500))
+        .force('x',         d3.forceX(W / 2).strength(0.04))
+        .force('y',         d3.forceY((n) => (n.depth + 0.8) * levelH).strength(0.55))
+        .force('collision', d3.forceCollide(NODE_R + 22));
       graphSimulation = simulation;
 
-      // Visible edge paths (use path not line — supports curves for bidi edges)
+      // Edge paths
       const link = g.append('g').selectAll('path')
         .data(edges).join('path')
         .attr('class', 'g-link')
         .attr('stroke-width', (e) => isBidi(e) ? 2 : 1.5)
-        .attr('stroke-opacity', (e) => isBidi(e) ? 0.75 : 0.55)
+        .attr('stroke-opacity', (e) => isBidi(e) ? 0.75 : 0.5)
         .attr('fill', 'none')
         .attr('marker-end', 'url(#g-arrow)');
 
-      // Transparent wider hit area for edge hover
+      // Wider transparent hit area for edge hover
       const linkHit = g.append('g').selectAll('path')
         .data(edges).join('path')
         .attr('stroke', 'transparent').attr('stroke-width', 14)
-        .attr('fill', 'none').attr('cursor', 'pointer');
+        .attr('fill', 'none').attr('cursor', 'default');
 
-      // Custom HTML tooltip (full text, word-wrapped, follows cursor)
       const graphPane = document.getElementById('graph-pane');
       const tooltip   = document.getElementById('g-tooltip');
 
@@ -563,74 +570,81 @@ export class GlimpsePanelManager {
         const rect = graphPane.getBoundingClientRect();
         let x = ev.clientX - rect.left + 14;
         let y = ev.clientY - rect.top  - 10;
-        if (x + 296 > graphPane.clientWidth)  x = ev.clientX - rect.left - 296;
-        if (y + 60   > graphPane.clientHeight) y = ev.clientY - rect.top  - 60;
+        if (x + 300 > graphPane.clientWidth)  x = ev.clientX - rect.left - 300;
+        if (y + 80  > graphPane.clientHeight) y = ev.clientY - rect.top  - 80;
         tooltip.style.left = x + 'px';
         tooltip.style.top  = y + 'px';
       }
 
+      // Edge tooltip: just show file names
       linkHit
         .on('mouseenter', (ev, e) => {
-          tooltip.textContent = (isBidi(e) ? '⇄ ' : '') + e.label;
+          const fromName = e.from.split('/').pop() ?? e.from;
+          const toName   = e.to.split('/').pop()   ?? e.to;
+          tooltip.textContent = (isBidi(e) ? '⇄ ' : '') + fromName + ' → ' + toName;
           tooltip.style.display = 'block';
           posTooltip(ev);
         })
-        .on('mousemove', (ev) => posTooltip(ev))
-        .on('mouseleave', () => { tooltip.style.display = 'none'; });
+        .on('mousemove',  (ev) => posTooltip(ev))
+        .on('mouseleave', ()  => { tooltip.style.display = 'none'; });
 
-      // Node groups
+      // ── Node groups ────────────────────────────────────────────
       let nodeDragged = false;
       const nodeG = g.append('g').selectAll('g')
         .data(nodes).join('g').attr('cursor', 'pointer')
         .call(d3.drag()
           .on('start', (ev, d) => { nodeDragged = false; if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on('drag',  (ev, d) => { nodeDragged = true; d.fx = ev.x; d.fy = ev.y; })
+          .on('drag',  (ev, d) => { nodeDragged = true;  d.fx = ev.x; d.fy = ev.y; })
           .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
 
       nodeG.append('circle').attr('r', NODE_R)
-        .attr('fill', (_, i) => COLORS[i % COLORS.length])
+        .attr('fill', (n) => groupColor.get(n.featureGroup) ?? '#6c7a8a')
         .attr('fill-opacity', 0.9)
         .attr('stroke', 'var(--vscode-editor-background, #1e1e1e)').attr('stroke-width', 2);
 
       nodeG.append('text').attr('class', 'g-node-label')
-        .attr('text-anchor', 'middle').attr('dy', NODE_R + 16).attr('font-size', 12)
+        .attr('text-anchor', 'middle').attr('dy', NODE_R + 15).attr('font-size', 11)
         .attr('pointer-events', 'none')
         .text((n) => n.label);
 
-      // Node tooltip (show files on hover) + click to open primary file
+      // Node tooltip: usage + state + behaviors + methods
       nodeG
         .on('mouseenter', (ev, n) => {
-          if (!n.files || !n.files.length) return;
-          let html = '<strong style="font-size:12px;">' + n.label + '</strong>'
-                   + '<ul style="margin:6px 0 0 0;padding:0;list-style:none;">';
-          for (const f of n.files) {
-            html += '<li style="padding:4px 0;border-top:1px solid rgba(255,255,255,0.08);">'
-                  + '<span style="font-family:monospace;font-size:10px;opacity:0.7;">' + f.path + '</span>';
-            if (f.usage) {
-              html += '<br><span style="font-size:11px;">' + f.usage + '</span>';
-            }
-            if (f.methods && f.methods.length) {
-              html += '<br><span style="font-family:monospace;font-size:10px;opacity:0.55;">'
-                    + f.methods.slice(0, 3).join('  ·  ')
-                    + (f.methods.length > 3 ? '  …' : '') + '</span>';
-            }
-            html += '</li>';
+          let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
+          if (n.usage) {
+            html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
           }
-          const hasMethod = n.files.some((f) => f.methods && f.methods.length);
-          html += '</ul><div style="margin-top:6px;font-size:10px;opacity:0.5;">'
-                + (hasMethod ? '点击跳转到方法' : '点击打开文件') + '</div>';
+          if (n.state && n.state.length) {
+            html += '<div style="margin-top:8px;">'
+                  + '<span style="font-size:10px;opacity:0.5;">状态  </span>'
+                  + '<span style="font-family:monospace;font-size:10px;">' + n.state.join(' · ') + '</span>'
+                  + '</div>';
+          }
+          if (n.behaviors && n.behaviors.length) {
+            html += '<div style="margin-top:8px;font-size:10px;opacity:0.5;">交互流转</div>';
+            for (const b of n.behaviors) {
+              html += '<div style="font-size:11px;padding:1px 0 1px 4px;border-left:2px solid rgba(255,255,255,0.15);">→ ' + b + '</div>';
+            }
+          }
+          if (n.methods && n.methods.length) {
+            html += '<div style="margin-top:8px;">'
+                  + '<span style="font-size:10px;opacity:0.5;">方法  </span>'
+                  + '<span style="font-family:monospace;font-size:10px;">'
+                  + n.methods.slice(0, 4).join('  ·  ')
+                  + (n.methods.length > 4 ? '  …' : '') + '</span></div>';
+          }
+          const hint = (n.methods && n.methods.length) ? '点击跳转到方法' : '点击打开文件';
+          html += '<div style="margin-top:8px;font-size:10px;opacity:0.4;">' + hint + '</div>';
           tooltip.innerHTML = html;
           tooltip.style.display = 'block';
           posTooltip(ev);
         })
-        .on('mousemove', (ev) => { if (tooltip.style.display !== 'none') posTooltip(ev); })
-        .on('mouseleave', () => { tooltip.style.display = 'none'; })
+        .on('mousemove',  (ev) => { if (tooltip.style.display !== 'none') posTooltip(ev); })
+        .on('mouseleave', ()  => { tooltip.style.display = 'none'; })
         .on('click', (ev, n) => {
           if (nodeDragged) { nodeDragged = false; return; }
-          if (!n.files || !n.files.length) return;
-          const primary = n.files.find((f) => /\.(tsx|vue)$/i.test(f.path)) ?? n.files[0];
-          const absPath = currentModulePath + '/' + primary.path;
-          const firstMethod = primary.methods && primary.methods[0];
+          const absPath = currentModulePath + '/' + n.path;
+          const firstMethod = n.methods && n.methods[0];
           if (firstMethod) {
             vscode.postMessage({ type: 'openFileAtSymbol', filePath: absPath, symbol: firstMethod });
           } else {

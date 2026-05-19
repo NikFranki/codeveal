@@ -29,7 +29,7 @@ export function spawnAndCollect(
   cmd: string,
   args: string[],
   stdinData: string | null = null,
-  timeoutMs = 120_000
+  timeoutMs = 240_000
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
