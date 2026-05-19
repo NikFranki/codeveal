@@ -505,12 +505,31 @@ export class GlimpsePanelManager {
 
     // ── D3 feature relation graph ──────────────────────────────
     function fitGraph() {
-      if (!graphZoom) return;
+      if (!graphZoom || !graphSimulation) return;
+      const pane = document.getElementById('graph-pane');
+      const W = pane.clientWidth;
+      const H = pane.clientHeight;
+      const simNodes = graphSimulation.nodes();
+      if (!simNodes.length) return;
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of simNodes) {
+        const r = n.isDir ? (n.rectW || 120) / 2 + 4 : 28;
+        minX = Math.min(minX, n.x - r);
+        maxX = Math.max(maxX, n.x + r);
+        minY = Math.min(minY, n.y - r);
+        maxY = Math.max(maxY, n.y + r);
+      }
+
+      const bw = maxX - minX || 1;
+      const bh = maxY - minY || 1;
+      const pad = 40;
+      const scale = Math.min(0.95, (W - pad * 2) / bw, (H - pad * 2) / bh);
+      const tx = W / 2 - scale * (minX + bw / 2);
+      const ty = H / 2 - scale * (minY + bh / 2);
+
       d3.select('#graph-svg').transition().duration(300)
-        .call(graphZoom.transform, d3.zoomIdentity.translate(
-          document.getElementById('graph-pane').clientWidth / 2,
-          document.getElementById('graph-pane').clientHeight / 2
-        ).scale(0.85));
+        .call(graphZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
     }
 
     function computeVisibleGraph(graph) {
