@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { AISkill } from './types';
 import { spawnAndCollect } from './claude-skill';
+import { getAITimeoutMs } from '../config';
 
 const execFileAsync = promisify(execFile);
 
@@ -43,7 +44,8 @@ export class CodexSkill implements AISkill {
       await spawnAndCollect(
         bin,
         ['exec', '--ephemeral', '--color', 'never', '--skip-git-repo-check', '--output-last-message', tmpFile, '-'],
-        prompt
+        prompt,
+        getAITimeoutMs()
       );
       return fs.readFileSync(tmpFile, 'utf8').trim();
     } finally {

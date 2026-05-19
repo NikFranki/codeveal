@@ -26,3 +26,10 @@ export function getClaudeModel(): string {
     vscode.workspace.getConfiguration('glimpse').get<string>('claudeModel') ?? DEFAULT_CLAUDE_MODEL
   );
 }
+
+const DEFAULT_AI_TIMEOUT_S = 360;
+
+export function getAITimeoutMs(): number {
+  const s = vscode.workspace.getConfiguration('glimpse').get<number>('aiTimeout') ?? DEFAULT_AI_TIMEOUT_S;
+  return Math.max(30, s) * 1000;
+}

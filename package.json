@@ -52,6 +52,12 @@
           ],
           "default": "auto",
           "description": "指定使用的 AI CLI（auto 会自动检测）"
+        },
+        "glimpse.aiTimeout": {
+          "type": "number",
+          "default": 360,
+          "minimum": 30,
+          "description": "AI CLI 调用超时时间（秒）。超时后子进程会被终止并报错。"
         }
       }
     }

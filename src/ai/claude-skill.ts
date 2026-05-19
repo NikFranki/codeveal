@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AISkill } from './types';
+import { getAITimeoutMs } from '../config';
 
 const execFileAsync = promisify(execFile);
 
@@ -21,7 +22,7 @@ export class ClaudeSkill implements AISkill {
 
   run(prompt: string): Promise<string> {
     // Pass prompt via stdin to avoid OS arg-length limits on large modules.
-    return spawnAndCollect('claude', ['--print', '--model', this.model], prompt);
+    return spawnAndCollect('claude', ['--print', '--model', this.model], prompt, getAITimeoutMs());
   }
 }
 
@@ -29,7 +30,7 @@ export function spawnAndCollect(
   cmd: string,
   args: string[],
   stdinData: string | null = null,
-  timeoutMs = 240_000
+  timeoutMs = 360_000
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
