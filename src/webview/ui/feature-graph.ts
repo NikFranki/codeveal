@@ -7,7 +7,7 @@ export function buildFeatureGraph(analysis: ModuleAnalysis): FeatureGraphData {
     label: f.feature,
     files: f.components
       .filter((c) => c.name)
-      .map((c) => ({ path: c.name, usage: c.usage ?? '' })),
+      .map((c) => ({ path: c.name, usage: c.usage ?? '', methods: c.methods ?? [] })),
   }));
   const edges = analysis.ai.featureRelations.map((r) => ({
     from: r.from,

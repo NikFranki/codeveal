@@ -1,8 +1,9 @@
 import { ModuleAnalysis } from '../analyzer/types';
 
 export interface FeatureGraphFile {
-  path: string;   // relative to module (e.g. "components/grid.tsx")
-  usage: string;  // AI-described purpose
+  path: string;      // relative to module (e.g. "components/grid.tsx")
+  usage: string;     // AI-described purpose
+  methods?: string[]; // function/method names in this file for this feature
 }
 
 export interface FeatureGraphData {
@@ -20,6 +21,7 @@ export type ExtensionToWebviewMessage =
 // Webview → Extension
 export type WebviewToExtensionMessage =
   | { type: 'openFile'; filePath: string }
+  | { type: 'openFileAtSymbol'; filePath: string; symbol: string }
   | { type: 'openFolder'; folderPath: string }
   | { type: 'openUrl'; url: string }
   | { type: 'drillDown'; folderPath: string };

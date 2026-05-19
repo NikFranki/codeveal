@@ -47,6 +47,9 @@ export class GlimpsePanelManager {
         case 'openFile':
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.filePath));
           break;
+        case 'openFileAtSymbol':
+          openFileAtSymbol(msg.filePath, msg.symbol);
+          break;
         case 'openFolder':
           vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(msg.folderPath));
           break;
@@ -606,9 +609,16 @@ export class GlimpsePanelManager {
             if (f.usage) {
               html += '<br><span style="font-size:11px;">' + f.usage + '</span>';
             }
+            if (f.methods && f.methods.length) {
+              html += '<br><span style="font-family:monospace;font-size:10px;opacity:0.55;">'
+                    + f.methods.slice(0, 3).join('  ·  ')
+                    + (f.methods.length > 3 ? '  …' : '') + '</span>';
+            }
             html += '</li>';
           }
-          html += '</ul><div style="margin-top:6px;font-size:10px;opacity:0.5;">点击打开文件</div>';
+          const hasMethod = n.files.some((f) => f.methods && f.methods.length);
+          html += '</ul><div style="margin-top:6px;font-size:10px;opacity:0.5;">'
+                + (hasMethod ? '点击跳转到方法' : '点击打开文件') + '</div>';
           tooltip.innerHTML = html;
           tooltip.style.display = 'block';
           posTooltip(ev);
@@ -619,7 +629,13 @@ export class GlimpsePanelManager {
           if (nodeDragged) { nodeDragged = false; return; }
           if (!n.files || !n.files.length) return;
           const primary = n.files.find((f) => /\.(tsx|vue)$/i.test(f.path)) ?? n.files[0];
-          vscode.postMessage({ type: 'openFile', filePath: currentModulePath + '/' + primary.path });
+          const absPath = currentModulePath + '/' + primary.path;
+          const firstMethod = primary.methods && primary.methods[0];
+          if (firstMethod) {
+            vscode.postMessage({ type: 'openFileAtSymbol', filePath: absPath, symbol: firstMethod });
+          } else {
+            vscode.postMessage({ type: 'openFile', filePath: absPath });
+          }
         });
 
       simulation.on('tick', () => {
@@ -786,6 +802,37 @@ export class GlimpsePanelManager {
 </body>
 </html>`;
   }
+}
+
+async function openFileAtSymbol(filePath: string, symbol: string): Promise<void> {
+  const uri = vscode.Uri.file(filePath);
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const text = doc.getText();
+  const lines = text.split('\n');
+
+  // Match common TS/JS function declaration patterns
+  const patterns = [
+    new RegExp(`\\bfunction\\s+${escapeRe(symbol)}\\b`),
+    new RegExp(`\\b${escapeRe(symbol)}\\s*[:=]\\s*(?:async\\s+)?(?:function|\\()`),
+    new RegExp(`\\b${escapeRe(symbol)}\\s*\\(`),
+  ];
+
+  let lineIndex = -1;
+  outer: for (let i = 0; i < lines.length; i++) {
+    for (const p of patterns) {
+      if (p.test(lines[i])) { lineIndex = i; break outer; }
+    }
+  }
+
+  const pos = new vscode.Position(Math.max(lineIndex, 0), 0);
+  const editor = await vscode.window.showTextDocument(doc, { selection: new vscode.Range(pos, pos) });
+  if (lineIndex >= 0) {
+    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+  }
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function getNonce(): string {
