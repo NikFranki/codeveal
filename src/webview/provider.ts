@@ -756,7 +756,7 @@ export class GlimpsePanelManager {
             '<div style="font-size:10px;opacity:0.5;margin-bottom:4px;">'
             + (isBidi(e) ? '⇄ 双向依赖' : '导入关系') + '</div>'
             + '<code style="font-size:10px;word-break:break-all;">' + fromPath + '</code>'
-            + '<div style="font-size:11px;padding:3px 0 2px;opacity:0.6;">→ 被导入到</div>'
+            + '<div style="font-size:11px;padding:3px 0 2px;opacity:0.6;">→ 导入了</div>'
             + '<code style="font-size:10px;word-break:break-all;">' + toPath + '</code>';
           tooltip.style.pointerEvents = 'none';
           tooltip.style.display = 'block';
