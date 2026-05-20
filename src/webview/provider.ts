@@ -1133,10 +1133,17 @@ async function openFileAtSymbol(filePath: string, symbol: string): Promise<void>
   const text = doc.getText();
   const lines = text.split('\n');
 
-  // Match common TS/JS function declaration patterns
+  // Match TS/JS function declarations, state variable declarations, and Vue data keys
   const patterns = [
     new RegExp(`\\bfunction\\s+${escapeRe(symbol)}\\b`),
     new RegExp(`\\b${escapeRe(symbol)}\\s*[:=]\\s*(?:async\\s+)?(?:function|\\()`),
+    // React useState: const [symbol, setSomething] = useState(...)
+    new RegExp(`\\bconst\\s+\\[${escapeRe(symbol)}[,\\]]`),
+    // const/let/var declaration
+    new RegExp(`\\b(?:const|let|var)\\s+${escapeRe(symbol)}\\b`),
+    // Vue data() object key:  symbol:
+    new RegExp(`^\\s*${escapeRe(symbol)}\\s*:`),
+    // last resort: function call / usage
     new RegExp(`\\b${escapeRe(symbol)}\\s*\\(`),
   ];
 
