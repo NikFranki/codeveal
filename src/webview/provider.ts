@@ -307,6 +307,16 @@ export class CodevealPanelManager {
     .tip-section.open .tip-section-bd { max-height: 200px; opacity: 1; }
     .tip-section.open .tip-section-hd { opacity: 0.8; }
     .tip-section.open .tip-section-hd::after { content: ' ▼'; }
+    .tip-symbol {
+      display: inline-block;
+      font-family: monospace; font-size: 10px;
+      padding: 1px 4px; margin: 2px 2px 0 0;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.06);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .tip-symbol:hover { background: rgba(255,255,255,0.18); text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -401,8 +411,16 @@ export class CodevealPanelManager {
       gTooltipEl.style.pointerEvents = 'none';
       nodeHideTimer = null;
     });
-    // Click on section header toggles .open — reposition after the 0.2s CSS transition finishes
+    // Click on section header toggles .open; click on symbol navigates to its definition
     gTooltipEl.addEventListener('click', (ev) => {
+      const sym = ev.target.closest('.tip-symbol');
+      if (sym) {
+        if (currentTooltipNode && !currentTooltipNode.isDir) {
+          const absPath = currentModulePath + '/' + currentTooltipNode.path;
+          vscode.postMessage({ type: 'openFileAtSymbol', filePath: absPath, symbol: sym.dataset.symbol });
+        }
+        return;
+      }
       const hd = ev.target.closest('.tip-section-hd');
       if (!hd) return;
       hd.closest('.tip-section').classList.toggle('open');
@@ -833,12 +851,14 @@ export class CodevealPanelManager {
           html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
         }
         if (n.state && n.state.length) {
+          const stateChips = n.state.map(s =>
+            '<span class="tip-symbol" data-symbol="' + s + '">' + s + '</span>'
+          ).join('');
           html += '<div class="tip-section">'
                 + '<div class="tip-section-hd">状态</div>'
                 + '<div class="tip-section-bd">'
-                + '<div style="font-family:monospace;font-size:10px;padding-top:3px;">'
-                + n.state.join(' · ')
-                + '</div></div></div>';
+                + '<div style="padding-top:3px;">' + stateChips + '</div>'
+                + '</div></div>';
         }
         if (n.behaviors && n.behaviors.length) {
           html += '<div class="tip-section"><div class="tip-section-hd">交互流转</div>'
@@ -850,14 +870,17 @@ export class CodevealPanelManager {
           html += '</div></div>';
         }
         if (n.methods && n.methods.length) {
+          const methodChips = n.methods.slice(0, 8).map(m =>
+            '<span class="tip-symbol" data-symbol="' + m + '">' + m + '</span>'
+          ).join('');
           html += '<div class="tip-section"><div class="tip-section-hd">方法</div>'
                 + '<div class="tip-section-bd">'
-                + '<div style="font-family:monospace;font-size:10px;padding-top:3px;">'
-                + n.methods.slice(0, 6).join(' · ')
-                + (n.methods.length > 6 ? ' …' : '')
+                + '<div style="padding-top:3px;">' + methodChips
+                + (n.methods.length > 8 ? '<span style="font-size:10px;opacity:0.4;"> +' + (n.methods.length - 8) + '</span>' : '')
                 + '</div></div></div>';
         }
-        const hint = (n.methods && n.methods.length) ? '点击跳转到方法' : '点击打开文件';
+        const hasSymbols = (n.methods && n.methods.length) || (n.state && n.state.length);
+        const hint = hasSymbols ? '点击方法/状态跳转到定义，点击节点打开文件' : '点击打开文件';
         html += '<div style="margin-top:8px;font-size:10px;opacity:0.4;">' + hint + '</div>';
         return html;
       }
