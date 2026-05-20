@@ -289,22 +289,23 @@ export class CodevealPanelManager {
       z-index: 20;
       word-break: break-word;
     }
-    /* ── collapsible tooltip sections (hover to expand) ── */
+    /* ── collapsible tooltip sections (click to expand) ── */
     .tip-section { margin-top: 6px; }
     .tip-section-hd {
       display: flex; align-items: center;
       font-size: 10px; opacity: 0.45;
-      cursor: default; user-select: none;
+      cursor: pointer; user-select: none;
     }
+    .tip-section-hd:hover { opacity: 0.7; }
     .tip-section-hd::after { content: ' ▶'; font-size: 8px; margin-left: 2px; }
     .tip-section-bd {
       overflow: hidden; max-height: 0;
       opacity: 0;
       transition: max-height 0.2s ease, opacity 0.15s;
     }
-    .tip-section:hover .tip-section-bd { max-height: 200px; opacity: 1; }
-    .tip-section:hover .tip-section-hd { opacity: 0.8; }
-    .tip-section:hover .tip-section-hd::after { content: ' ▼'; }
+    .tip-section.open .tip-section-bd { max-height: 200px; opacity: 1; }
+    .tip-section.open .tip-section-hd { opacity: 0.8; }
+    .tip-section.open .tip-section-hd::after { content: ' ▼'; }
   </style>
 </head>
 <body>
@@ -396,6 +397,12 @@ export class CodevealPanelManager {
       gTooltipEl.style.display = 'none';
       gTooltipEl.style.pointerEvents = 'none';
       nodeHideTimer = null;
+    });
+    // Click on section header toggles .open — keeps section expanded while mouse moves inside tooltip
+    gTooltipEl.addEventListener('click', (ev) => {
+      const hd = ev.target.closest('.tip-section-hd');
+      if (!hd) return;
+      hd.closest('.tip-section').classList.toggle('open');
     });
 
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
