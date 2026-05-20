@@ -1,8 +1,8 @@
-# Glimpse — Claude Code 工作指引
+# Codeveal — Claude Code 工作指引
 
 ## 项目简介
 
-Glimpse 是一个 VSCode 插件：右键功能模块文件夹 → 侧边栏展示思维导图，四维度呈现模块职责、对外暴露、外部依赖、数据流。
+Codeveal 是一个 VSCode 插件：右键功能模块文件夹 → 侧边栏展示思维导图，四维度呈现模块职责、对外暴露、外部依赖、数据流。
 
 目标仓库是 `fms-network` monorepo（React + Vue2，含 Webpack Module Federation）。
 
@@ -41,7 +41,7 @@ src/
 ## 关键约束
 
 - AI 调用是子进程，不阻塞 VSCode 主线程（用 async/await + spawn）
-- 插件激活事件：`onCommand:glimpse.analyzeModule`，按需激活
+- 插件激活事件：`onCommand:codeveal.analyzeModule`，按需激活
 - MF 依赖：静态读 webpack.config.js 的 `exposes`/`remotes` 字段
 
 ## 开发命令
@@ -58,5 +58,5 @@ pnpm run compile
 
 ## 参考
 
-- 需求文档：`glimpse-spec.md`
+- 需求文档：`codeveal-spec.md`
 - 开发计划：`plan.md`

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Codeveal** (display name: Glimpse) is a VS Code extension. Right-click a folder or `.ts/.tsx/.vue/.js` file in the Explorer → "Codeveal: Analyze This Module" → a panel opens beside the editor with a **Mindmap** tab (markmap) and a **Feature Graph** tab (D3 force-DAG). The command ID is `codeveal.analyzeModule`.
+**Codeveal** is a VS Code extension. Right-click a folder or `.ts/.tsx/.vue/.js` file in the Explorer → "Codeveal: Analyze This Module" → a panel opens beside the editor with a **Mindmap** tab (markmap) and a **Feature Graph** tab (D3 force-DAG). The command ID is `codeveal.analyzeModule`.
 
 Target codebase: React + Vue 2 TypeScript monorepos, with Webpack Module Federation support.
 
@@ -90,5 +90,5 @@ Webview state is persisted via `vscode.getState()` / `vscode.setState()` so the 
 
 ## Reference files
 
-- Spec: `glimpse-spec.md`
+- Spec: `codeveal-spec.md`
 - Plan / task tracker: `plan.md` — mark tasks `[x]` when complete

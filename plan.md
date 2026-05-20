@@ -1,6 +1,6 @@
-# Glimpse — 开发计划
+# Codeveal — 开发计划
 
-> 基于 glimpse-spec.md，从零搭建 VSCode 插件。
+> 基于 codeveal-spec.md，从零搭建 VSCode 插件。
 > 状态标记：`[ ]` 待做 · `[x]` 已完成 · `[~]` 进行中
 
 ---
@@ -10,7 +10,7 @@
 ### 目录结构
 
 ```
-glimpse/
+codeveal/
 ├── .claude/
 │   └── CLAUDE.md                     # Claude Code 工作指引
 ├── src/
@@ -39,7 +39,7 @@ glimpse/
 ├── package.json                      # 插件 manifest
 ├── tsconfig.json
 ├── .vscodeignore
-└── glimpse-spec.md
+└── codeveal-spec.md
 ```
 
 ### 核心类型（src/analyzer/types.ts）
@@ -151,7 +151,7 @@ ui/mindmap.ts → markmap 渲染四维度节点
 
 ### Phase 5 — 配置 & 体验
 
-- [x] **5.1** `src/config.ts`：读取 `glimpse.aiProvider` 设置（auto / claude / codex）
+- [x] **5.1** `src/config.ts`：读取 `codeveal.aiProvider` 设置（auto / claude / codex）
 - [x] **5.2** `package.json` contributes.configuration：暴露 aiProvider 配置项
 - [x] **5.3** 加载中状态、错误提示（AI 不可用时的友好 fallback）
 

@@ -1,4 +1,4 @@
-# Glimpse — VSCode 插件需求规格文档
+# Codeveal — VSCode 插件需求规格文档
 
 > 帮助团队新人快速理解项目模块结构的 VSCode 插件。
 
@@ -61,7 +61,7 @@ fms-network/                        # monorepo 根目录
 ## MVP 功能范围
 
 ### 触发方式
-右键任意文件夹 → 菜单出现 **"Glimpse: 分析此模块"** → 侧边栏打开思维导图
+右键任意文件夹 → 菜单出现 **"Codeveal: 分析此模块"** → 侧边栏打开思维导图
 
 ### 分析粒度
 以页面/视图子目录为推荐粒度，例如：
@@ -168,7 +168,7 @@ class CodexSkill implements AISkill {
 ### 参考项目
 
 **Graphify**（https://github.com/safishamsi/graphify）：
-- 定位不同（CLI skill，面向 AI 对话查询；Glimpse 是 VSCode 可视化工具）
+- 定位不同（CLI skill，面向 AI 对话查询；Codeveal 是 VSCode 可视化工具）
 - 可复用其静态分析思路（tree-sitter AST 提取、调用图）
 - 可考虑直接读取 Graphify 生成的 `graphify-out/graph.json` 作为数据源，减少重复开发
 
@@ -203,4 +203,4 @@ class CodexSkill implements AISkill {
 
 ## 插件名
 
-**Glimpse** — 一瞥即懂
+**Codeveal** — 一瞥即懂

@@ -36,7 +36,7 @@ export interface ModuleSkeleton {
   files: FileInfo[];
   publicExports: ExportInfo[];
   externalDeps: string[];   // public npm packages
-  companyDeps: string[];    // company-internal packages (matched by glimpse.companyScopes)
+  companyDeps: string[];    // company-internal packages (matched by codeveal.companyScopes)
   mfDeps: MFDep[];
 }
 

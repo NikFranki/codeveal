@@ -1,8 +1,8 @@
-# Glimpse
+# Codeveal
 
 > **Right-click any module folder → instant AI-powered architecture map in your editor.**
 
-Glimpse is a VS Code extension that analyzes a feature folder in your codebase, calls a local AI CLI (Claude or Codex), and renders two interactive views side by side:
+Codeveal is a VS Code extension that analyzes a feature folder in your codebase, calls a local AI CLI (Claude or Codex), and renders two interactive views side by side:
 
 - **Mindmap** — four-dimensional breakdown: responsibilities, public exports, external dependencies, data flow
 - **Feature Graph** — file-level dependency graph with per-file AI annotations, hover tooltips, and click-to-navigate
@@ -13,7 +13,7 @@ Built for large React / Vue 2 + TypeScript monorepos, with first-class support f
 
 ## Demo
 
-![Glimpse Feature Graph](assets/feature-graph-demo.png)
+![Codeveal Feature Graph](assets/feature-graph-demo.png)
 
 *Feature Graph of an `order-management` module — nodes are source files, arrows show import direction (A → B means A imports B), colors group files by feature domain. Hover any node for AI-generated usage summary, state variables, and interaction flows. Click to jump to the file (or directly to a method).*
 
@@ -49,8 +49,8 @@ Built for large React / Vue 2 + TypeScript monorepos, with first-class support f
 
 ```bash
 # Clone and build locally
-git clone https://github.com/NikFranki/glimpse
-cd glimpse
+git clone https://github.com/NikFranki/codeveal
+cd codeveal
 pnpm install
 pnpm run compile
 ```
@@ -63,7 +63,7 @@ Then press **F5** in VS Code to open an Extension Development Host, or package w
 
 1. Open the codebase you want to explore in VS Code
 2. In the Explorer sidebar, **right-click any feature folder** (or a single `.ts` / `.tsx` / `.vue` file)
-3. Choose **"Glimpse: Analyze This Module"**
+3. Choose **"Codeveal: Analyze This Module"**
 4. A panel opens beside your editor — watch the progress steps as static analysis and AI annotation run
 5. Switch between **Mindmap** and **Feature Graph** tabs
 

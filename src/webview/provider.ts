@@ -31,7 +31,7 @@ export class CodevealPanelManager {
 
     this._panel = vscode.window.createWebviewPanel(
       'codeveal.mindmap',
-      'Glimpse',
+      'Codeveal',
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -112,7 +112,7 @@ export class CodevealPanelManager {
              style-src 'unsafe-inline' https://cdn.jsdelivr.net;
              img-src data: https:;
              font-src data: https://cdn.jsdelivr.net;" />
-  <title>Glimpse</title>
+  <title>Codeveal</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -310,7 +310,7 @@ export class CodevealPanelManager {
 <body>
   <div id="state-welcome">
     <div>💡</div>
-    <p>右键文件夹 →<br><strong>Glimpse: 分析此模块</strong></p>
+    <p>右键文件夹 →<br><strong>Codeveal: 分析此模块</strong></p>
   </div>
 
   <div id="state-loading">
