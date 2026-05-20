@@ -843,8 +843,7 @@ export class CodevealPanelManager {
       function buildNodeHTML(n) {
         if (n.isDir) {
           return '<strong style="font-size:12px;">' + (n.expanded ? '▼' : '▶') + ' 📁 ' + n.label + '/</strong>'
-            + '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.fileCount + ' 个文件</div>'
-            + '<div style="margin-top:8px;font-size:10px;opacity:0.4;">点击' + (n.expanded ? '折叠' : '展开') + '目录</div>';
+            + '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.fileCount + ' 个文件</div>';
         }
         const hasSymbols = (n.methods && n.methods.length) || (n.state && n.state.length);
         // ↗ badge in top-right corner when there are clickable symbols
