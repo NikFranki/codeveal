@@ -3,3 +3,5 @@ out/
 *.vsix
 .DS_Store
 .playwright-mcp/
+spec.md
+plan.md
