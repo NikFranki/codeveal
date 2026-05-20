@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { GlimpsePanelManager } from '../webview/provider';
+import { CodevealPanelManager } from '../webview/provider';
 import { analyzeModule } from '../analyzer/index';
 import { detectSkill } from '../ai/detector';
 import { buildPrompt, parseAIOutput } from '../ai/prompt-builder';
@@ -19,7 +19,7 @@ function staticFallback(skeleton: ModuleSkeleton, reason?: string): ModuleAnalys
 }
 
 export async function analyzeModuleCommand(
-  provider: GlimpsePanelManager,
+  provider: CodevealPanelManager,
   uri: vscode.Uri
 ): Promise<void> {
   await provider.focusView();
@@ -29,7 +29,7 @@ export async function analyzeModuleCommand(
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Glimpse',
+        title: 'Codeveal',
         cancellable: false,
       },
       async (progress) => {
@@ -75,16 +75,16 @@ export async function analyzeModuleCommand(
           } catch (aiErr) {
             const aiMsg = aiErr instanceof Error ? aiErr.message : String(aiErr);
             provider.postMessage({ type: 'progress', step: 'AI 分析失败，使用静态分析兜底' });
-            vscode.window.showWarningMessage(`Glimpse: AI 分析失败（${aiMsg.slice(0, 120)}）`);
+            vscode.window.showWarningMessage(`Codeveal: AI 分析失败（${aiMsg.slice(0, 120)}）`);
             analysis = staticFallback(skeleton, aiMsg.slice(0, 200));
           }
         } else {
           const picked = await vscode.window.showWarningMessage(
-            'Glimpse: 未检测到 claude 或 codex CLI，仅显示静态分析结果',
+            'Codeveal: 未检测到 claude 或 codex CLI，仅显示静态分析结果',
             '打开设置'
           );
           if (picked === '打开设置') {
-            vscode.commands.executeCommand('workbench.action.openSettings', 'glimpse.aiProvider');
+            vscode.commands.executeCommand('workbench.action.openSettings', 'codeveal.aiProvider');
           }
           analysis = staticFallback(skeleton, '未检测到 AI CLI');
         }

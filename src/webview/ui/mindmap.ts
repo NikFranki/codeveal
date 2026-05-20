@@ -4,7 +4,7 @@ import { FileInfo, ModuleAnalysis } from '../../analyzer/types';
 
 /**
  * Converts a ModuleAnalysis into markmap-flavored markdown.
- * File-linked nodes use the `glimpse-file:` scheme so the webview
+ * File-linked nodes use the `codeveal-file:` scheme so the webview
  * can intercept clicks and post openFile messages back to the extension.
  */
 export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
@@ -30,7 +30,7 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
       const fileName = filePath.split('/').pop() ?? filePath;
       const kind = fileKindFromName(fileName);
       const encoded = encodeURIComponent(filePath);
-      lines.push(`- [${fileName} *(${kind})*](glimpse-file:${encoded})`);
+      lines.push(`- [${fileName} *(${kind})*](codeveal-file:${encoded})`);
     }
   }
 
@@ -50,7 +50,7 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
       for (const dep of crossModuleDeps) {
         const resolved = resolveAlias(dep, analysis.modulePath);
         const node = resolved
-          ? `[${dep}](glimpse-mod:${encodeURIComponent(resolved)})`
+          ? `[${dep}](codeveal-mod:${encodeURIComponent(resolved)})`
           : dep;
         lines.push(`  - ${node}`);
       }
@@ -59,14 +59,14 @@ export function buildMarkmapMarkdown(analysis: ModuleAnalysis): string {
     if (analysis.companyDeps.length > 0) {
       lines.push('', '- 公司共享库');
       for (const dep of analysis.companyDeps) {
-        lines.push(`  - [${dep}](glimpse-pkg:${encodeURIComponent(dep)})`);
+        lines.push(`  - [${dep}](codeveal-pkg:${encodeURIComponent(dep)})`);
       }
     }
 
     if (analysis.externalDeps.length > 0) {
       lines.push('', '- npm 包');
       for (const dep of analysis.externalDeps) {
-        lines.push(`  - [${dep}](glimpse-pkg:${encodeURIComponent(dep)})`);
+        lines.push(`  - [${dep}](codeveal-pkg:${encodeURIComponent(dep)})`);
       }
     }
 
@@ -156,7 +156,7 @@ function resolveAlias(dep: string, modulePath: string): string | null {
 /**
  * Detect relative file path patterns (e.g. "list/index.tsx", "api.ts") in a
  * plain-text string and wrap any that actually exist on disk into a
- * glimpse-file: link so markmap renders them as clickable anchors.
+ * codeveal-file: link so markmap renders them as clickable anchors.
  */
 function linkifyPaths(text: string, modulePath: string): string {
   // Matches optional leading folder segments + filename with a known extension
@@ -166,7 +166,7 @@ function linkifyPaths(text: string, modulePath: string): string {
       const absPath = path.join(modulePath, match);
       try {
         fs.accessSync(absPath);
-        return `[${match}](glimpse-file:${encodeURIComponent(absPath)})`;
+        return `[${match}](codeveal-file:${encodeURIComponent(absPath)})`;
       } catch {
         return match; // file not found — keep as plain text
       }

@@ -7,19 +7,19 @@ import { buildFeatureGraph } from './ui/feature-graph';
  * Manages a singleton WebviewPanel in the main editor area.
  * Replaces the old sidebar WebviewView to give the mindmap full screen space.
  */
-export class GlimpsePanelManager {
-  private static _instance?: GlimpsePanelManager;
+export class CodevealPanelManager {
+  private static _instance?: CodevealPanelManager;
 
   private _panel?: vscode.WebviewPanel;
   private _pendingMessages: ExtensionToWebviewMessage[] = [];
 
   private constructor(private readonly _extensionUri: vscode.Uri) {}
 
-  static getInstance(extensionUri: vscode.Uri): GlimpsePanelManager {
-    if (!GlimpsePanelManager._instance) {
-      GlimpsePanelManager._instance = new GlimpsePanelManager(extensionUri);
+  static getInstance(extensionUri: vscode.Uri): CodevealPanelManager {
+    if (!CodevealPanelManager._instance) {
+      CodevealPanelManager._instance = new CodevealPanelManager(extensionUri);
     }
-    return GlimpsePanelManager._instance;
+    return CodevealPanelManager._instance;
   }
 
   /** Create the panel (or reveal it if already open). */
@@ -30,7 +30,7 @@ export class GlimpsePanelManager {
     }
 
     this._panel = vscode.window.createWebviewPanel(
-      'glimpse.mindmap',
+      'codeveal.mindmap',
       'Glimpse',
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
       {
@@ -58,7 +58,7 @@ export class GlimpsePanelManager {
           break;
         case 'drillDown':
           vscode.commands.executeCommand(
-            'glimpse.analyzeModule',
+            'codeveal.analyzeModule',
             vscode.Uri.file(msg.folderPath)
           );
           break;
@@ -937,20 +937,20 @@ export class GlimpsePanelManager {
       const a = e.target.closest('a');
       if (!a) return;
       const href = a.getAttribute('href') ?? '';
-      if (href.startsWith('glimpse-file:')) {
+      if (href.startsWith('codeveal-file:')) {
         e.preventDefault();
         e.stopPropagation();
-        const filePath = decodeURIComponent(href.slice('glimpse-file:'.length));
+        const filePath = decodeURIComponent(href.slice('codeveal-file:'.length));
         vscode.postMessage({ type: 'openFile', filePath });
-      } else if (href.startsWith('glimpse-pkg:')) {
+      } else if (href.startsWith('codeveal-pkg:')) {
         e.preventDefault();
         e.stopPropagation();
-        const pkg = decodeURIComponent(href.slice('glimpse-pkg:'.length));
+        const pkg = decodeURIComponent(href.slice('codeveal-pkg:'.length));
         vscode.postMessage({ type: 'openUrl', url: 'https://www.npmjs.com/package/' + pkg });
-      } else if (href.startsWith('glimpse-mod:')) {
+      } else if (href.startsWith('codeveal-mod:')) {
         e.preventDefault();
         e.stopPropagation();
-        const folderPath = decodeURIComponent(href.slice('glimpse-mod:'.length));
+        const folderPath = decodeURIComponent(href.slice('codeveal-mod:'.length));
         vscode.postMessage({ type: 'openFolder', folderPath });
       }
     }, true);

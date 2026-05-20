@@ -1,63 +1,66 @@
 {
-  "name": "glimpse",
-  "displayName": "Glimpse",
-  "description": "右键模块文件夹，侧边栏展示四维度思维导图",
+  "name": "codeveal",
+  "displayName": "Codeveal",
+  "description": "Right-click any module folder → AI-powered architecture mindmap & feature graph in your editor.",
   "version": "0.5.0",
-  "publisher": "glimpse-dev",
+  "publisher": "Franki",
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NikFranki/glimpse"
+  },
   "categories": ["Other"],
-  "activationEvents": [
-    "onCommand:glimpse.analyzeModule"
-  ],
+  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "glimpse.analyzeModule",
-        "title": "Glimpse: 分析此模块"
+        "command": "codeveal.analyzeModule",
+        "title": "Codeveal: Analyze This Module"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "glimpse.analyzeModule",
+          "command": "codeveal.analyzeModule",
           "when": "explorerResourceIsFolder",
           "group": "navigation"
         },
         {
-          "command": "glimpse.analyzeModule",
+          "command": "codeveal.analyzeModule",
           "when": "!explorerResourceIsFolder && resourceExtname =~ /\\.(ts|tsx|vue|js)$/",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
-      "title": "Glimpse",
+      "title": "Codeveal",
       "properties": {
-        "glimpse.companyScopes": {
+        "codeveal.companyScopes": {
           "type": "array",
           "items": { "type": "string" },
           "default": ["@scfe", "@spx", "@ssc", "@sc/", "ssc-", "sc-cli", "react-pro-components"],
-          "description": "包名前缀列表，匹配的包视为公司内部包，在思维导图中单独分组展示"
+          "description": "Package name prefixes treated as internal company deps (shown separately in the mindmap)"
         },
-        "glimpse.aiProvider": {
+        "codeveal.aiProvider": {
           "type": "string",
           "enum": ["auto", "claude", "codex"],
           "enumDescriptions": [
-            "自动检测：优先 claude，其次 codex",
-            "强制使用 claude CLI（需已安装 Claude Code）",
-            "强制使用 codex CLI（需已安装 OpenAI Codex）"
+            "Auto-detect: prefer claude, fallback to codex",
+            "Force claude CLI (requires Claude Code installed)",
+            "Force codex CLI (requires OpenAI Codex installed)"
           ],
           "default": "auto",
-          "description": "指定使用的 AI CLI（auto 会自动检测）"
+          "description": "Which AI CLI to use (auto detects automatically)"
         },
-        "glimpse.aiTimeout": {
+        "codeveal.aiTimeout": {
           "type": "number",
           "default": 360,
           "minimum": 30,
-          "description": "AI CLI 调用超时时间（秒）。超时后子进程会被终止并报错。"
+          "description": "AI CLI call timeout in seconds. The subprocess is killed and an error is shown when exceeded."
         }
       }
     }

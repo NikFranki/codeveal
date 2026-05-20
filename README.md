@@ -49,7 +49,7 @@ Built for large React / Vue 2 + TypeScript monorepos, with first-class support f
 
 ```bash
 # Clone and build locally
-git clone https://github.com/your-org/glimpse
+git clone https://github.com/NikFranki/glimpse
 cd glimpse
 pnpm install
 pnpm run compile
@@ -86,8 +86,8 @@ Then press **F5** in VS Code to open an Extension Development Host, or package w
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `glimpse.aiProvider` | `"auto"` | `auto` \| `claude` \| `codex` — which CLI to use |
-| `glimpse.companyScopes` | `["@scfe", "@ssc", …]` | Package prefixes treated as internal company deps (shown separately in the mindmap) |
+| `codeveal.aiProvider` | `"auto"` | `auto` \| `claude` \| `codex` — which CLI to use |
+| `codeveal.companyScopes` | `["@scfe", "@ssc", …]` | Package prefixes treated as internal company deps (shown separately in the mindmap) |
 
 ---
 
