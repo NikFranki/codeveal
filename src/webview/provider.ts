@@ -786,13 +786,11 @@ export class CodevealPanelManager {
         const W = graphPane.clientWidth;
         const H = graphPane.clientHeight;
 
-        // 节点在画布中的屏幕坐标
         const t  = d3.zoomTransform(svgEl);
         const nx = t.applyX(n.x);
         const ny = t.applyY(n.y);
         const nr = nodeR(n);
 
-        // 限制最大高度，防止超出面板
         tooltip.style.maxHeight = Math.min(360, H - PAD * 2) + 'px';
 
         const tw = tooltip.offsetWidth;
@@ -803,14 +801,26 @@ export class CodevealPanelManager {
         let left = goLeft ? nx - nr - 8 - tw : nx + nr + 8;
         left = Math.max(PAD, Math.min(left, W - tw - PAD));
 
-        // 上下：以节点为基准居中，超出就夹紧
-        let top = ny - th / 2;
+        // 上下：顶部与节点对齐，超出再夹紧
+        let top = ny - PAD;
         top = Math.max(PAD, Math.min(top, H - th - PAD));
 
         tooltip.style.left = left + 'px';
         tooltip.style.top  = top  + 'px';
       }
-      tooltipRepos = () => posNodeTooltip(currentTooltipNode);
+
+      // 展开 section 后只在溢出时才移动，不打扰正常位置
+      function adjustTooltipPos() {
+        const PAD = 6;
+        const H = graphPane.clientHeight;
+        tooltip.style.maxHeight = Math.min(360, H - PAD * 2) + 'px';
+        const th  = tooltip.offsetHeight;
+        const top = parseInt(tooltip.style.top) || 0;
+        if (top + th > H - PAD) {
+          tooltip.style.top = Math.max(PAD, H - th - PAD) + 'px';
+        }
+      }
+      tooltipRepos = adjustTooltipPos;
 
       function buildNodeHTML(n) {
         if (n.isDir) {
