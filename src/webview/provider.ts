@@ -277,6 +277,7 @@ export class CodevealPanelManager {
       position: absolute;
       max-width: 280px;
       max-height: 360px;
+      overflow-x: hidden;
       overflow-y: auto;
       padding: 8px 12px;
       background: var(--vscode-editorHoverWidget-background, #252526);
@@ -381,6 +382,8 @@ export class CodevealPanelManager {
     let activeTab = 'mindmap';
     let nodeHideTimer = null;
     let expandedDirs = new Set();
+    let currentTooltipNode = null;
+    let tooltipRepos = null;
 
     // "Collapse dirs" reset button
     document.getElementById('g-reset-folds').addEventListener('click', () => {
@@ -398,11 +401,15 @@ export class CodevealPanelManager {
       gTooltipEl.style.pointerEvents = 'none';
       nodeHideTimer = null;
     });
-    // Click on section header toggles .open — keeps section expanded while mouse moves inside tooltip
+    // Click on section header toggles .open — reposition after the 0.2s CSS transition finishes
     gTooltipEl.addEventListener('click', (ev) => {
       const hd = ev.target.closest('.tip-section-hd');
       if (!hd) return;
       hd.closest('.tip-section').classList.toggle('open');
+      // Delay matches max-height transition (0.2s); check tooltip is still visible before moving
+      setTimeout(() => {
+        if (gTooltipEl.style.display !== 'none' && tooltipRepos) tooltipRepos();
+      }, 220);
     });
 
     const FLEX_STATES = new Set([stateWelcome, stateLoading, stateError, stateMindmap]);
@@ -772,21 +779,38 @@ export class CodevealPanelManager {
         .on('mousemove',  (ev) => posEdgeTooltip(ev))
         .on('mouseleave', ()  => { tooltip.style.display = 'none'; });
 
-      // Node tooltip: anchored to node, interactive (sections expand on hover)
+      // Node tooltip: anchored to node, interactive (sections expand on click)
       function posNodeTooltip(n) {
-        const t = d3.zoomTransform(svgEl);
-        const px = t.applyX(n.x);
-        const py = t.applyY(n.y);
-        const TW = 284;
+        if (!n) return;
+        const PAD = 6;
+        const W = graphPane.clientWidth;
+        const H = graphPane.clientHeight;
+
+        // 节点在画布中的屏幕坐标
+        const t  = d3.zoomTransform(svgEl);
+        const nx = t.applyX(n.x);
+        const ny = t.applyY(n.y);
         const nr = nodeR(n);
-        let tx = px + nr + 8;
-        if (tx + TW > graphPane.clientWidth) tx = Math.max(4, px - TW - nr - 8);
-        let ty = py - 24;
-        if (ty < 4) ty = 4;
-        if (ty + 240 > graphPane.clientHeight) ty = Math.max(4, graphPane.clientHeight - 240);
-        tooltip.style.left = tx + 'px';
-        tooltip.style.top  = ty + 'px';
+
+        // 限制最大高度，防止超出面板
+        tooltip.style.maxHeight = Math.min(360, H - PAD * 2) + 'px';
+
+        const tw = tooltip.offsetWidth;
+        const th = tooltip.offsetHeight;
+
+        // 左右：右边放得下就放右边，否则放左边
+        const goLeft = nx + nr + 8 + tw > W - PAD;
+        let left = goLeft ? nx - nr - 8 - tw : nx + nr + 8;
+        left = Math.max(PAD, Math.min(left, W - tw - PAD));
+
+        // 上下：以节点为基准居中，超出就夹紧
+        let top = ny - th / 2;
+        top = Math.max(PAD, Math.min(top, H - th - PAD));
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top  = top  + 'px';
       }
+      tooltipRepos = () => posNodeTooltip(currentTooltipNode);
 
       function buildNodeHTML(n) {
         if (n.isDir) {
@@ -871,6 +895,7 @@ export class CodevealPanelManager {
       nodeG
         .on('mouseenter', (ev, n) => {
           if (nodeHideTimer) { clearTimeout(nodeHideTimer); nodeHideTimer = null; }
+          currentTooltipNode = n;
           tooltip.innerHTML = buildNodeHTML(n);
           tooltip.style.pointerEvents = 'auto';
           tooltip.style.display = 'block';
@@ -880,6 +905,7 @@ export class CodevealPanelManager {
           nodeHideTimer = setTimeout(() => {
             tooltip.style.display = 'none';
             tooltip.style.pointerEvents = 'none';
+            currentTooltipNode = null;
             nodeHideTimer = null;
           }, 150);
         })
