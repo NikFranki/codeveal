@@ -310,13 +310,15 @@ export class CodevealPanelManager {
     .tip-symbol {
       display: inline-block;
       font-family: monospace; font-size: 10px;
-      padding: 1px 4px; margin: 2px 2px 0 0;
+      padding: 1px 5px; margin: 2px 2px 0 0;
       border-radius: 3px;
-      background: rgba(255,255,255,0.06);
+      background: rgba(79,193,255,0.12);
+      color: #7dd3f8;
+      border: 1px solid rgba(79,193,255,0.25);
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .tip-symbol:hover { background: rgba(255,255,255,0.18); text-decoration: underline; }
+    .tip-symbol:hover { background: rgba(79,193,255,0.25); border-color: rgba(79,193,255,0.5); text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -847,13 +849,7 @@ export class CodevealPanelManager {
         }
         const hasSymbols = (n.methods && n.methods.length) || (n.state && n.state.length);
         // ↗ badge in top-right corner when there are clickable symbols
-        const badge = hasSymbols
-          ? '<span title="点击方法/状态跳转定义；点击节点打开文件" '
-          + 'style="position:absolute;top:4px;right:6px;font-size:9px;opacity:0.6;pointer-events:none;'
-          + 'padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.2);">↗ 跳转</span>'
-          : '';
-        let html = '<div style="position:relative;">' + badge
-                 + '<strong style="font-size:12px;">' + n.label + '</strong></div>';
+        let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
         if (n.usage) {
           html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
         }
