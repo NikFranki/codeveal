@@ -849,7 +849,8 @@ export class CodevealPanelManager {
         // ↗ badge in top-right corner when there are clickable symbols
         const badge = hasSymbols
           ? '<span title="点击方法/状态跳转定义；点击节点打开文件" '
-          + 'style="position:absolute;top:6px;right:8px;font-size:10px;opacity:0.35;pointer-events:none;">↗</span>'
+          + 'style="position:absolute;top:4px;right:6px;font-size:9px;opacity:0.6;pointer-events:none;'
+          + 'padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.2);">↗ 跳转</span>'
           : '';
         let html = '<div style="position:relative;">' + badge
                  + '<strong style="font-size:12px;">' + n.label + '</strong></div>';
