@@ -846,13 +846,20 @@ export class CodevealPanelManager {
             + '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.fileCount + ' 个文件</div>'
             + '<div style="margin-top:8px;font-size:10px;opacity:0.4;">点击' + (n.expanded ? '折叠' : '展开') + '目录</div>';
         }
-        let html = '<strong style="font-size:12px;">' + n.label + '</strong>';
+        const hasSymbols = (n.methods && n.methods.length) || (n.state && n.state.length);
+        // ↗ badge in top-right corner when there are clickable symbols
+        const badge = hasSymbols
+          ? '<span title="点击方法/状态跳转定义；点击节点打开文件" '
+          + 'style="position:absolute;top:6px;right:8px;font-size:10px;opacity:0.35;pointer-events:none;">↗</span>'
+          : '';
+        let html = '<div style="position:relative;">' + badge
+                 + '<strong style="font-size:12px;">' + n.label + '</strong></div>';
         if (n.usage) {
           html += '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + n.usage + '</div>';
         }
         if (n.state && n.state.length) {
           const stateChips = n.state.map(s =>
-            '<span class="tip-symbol" data-symbol="' + s + '">' + s + '</span>'
+            '<span class="tip-symbol" data-symbol="' + s + '" title="跳转到 ' + s + '">' + s + '</span>'
           ).join('');
           html += '<div class="tip-section">'
                 + '<div class="tip-section-hd">状态</div>'
@@ -871,7 +878,7 @@ export class CodevealPanelManager {
         }
         if (n.methods && n.methods.length) {
           const methodChips = n.methods.slice(0, 8).map(m =>
-            '<span class="tip-symbol" data-symbol="' + m + '">' + m + '</span>'
+            '<span class="tip-symbol" data-symbol="' + m + '" title="跳转到 ' + m + '">' + m + '</span>'
           ).join('');
           html += '<div class="tip-section"><div class="tip-section-hd">方法</div>'
                 + '<div class="tip-section-bd">'
@@ -879,9 +886,6 @@ export class CodevealPanelManager {
                 + (n.methods.length > 8 ? '<span style="font-size:10px;opacity:0.4;"> +' + (n.methods.length - 8) + '</span>' : '')
                 + '</div></div></div>';
         }
-        const hasSymbols = (n.methods && n.methods.length) || (n.state && n.state.length);
-        const hint = hasSymbols ? '点击方法/状态跳转到定义，点击节点打开文件' : '点击打开文件';
-        html += '<div style="margin-top:8px;font-size:10px;opacity:0.4;">' + hint + '</div>';
         return html;
       }
 
