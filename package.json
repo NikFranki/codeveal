@@ -1,6 +1,6 @@
 {
-  "name": "codeveal",
-  "displayName": "Codeveal",
+  "name": "codeveal-ext",
+  "displayName": "Codeveal - Module Analyzer",
   "description": "Right-click any module folder → AI-powered architecture mindmap & feature graph in your editor.",
   "version": "0.5.0",
   "publisher": "Franki",

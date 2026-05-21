@@ -1,4 +1,4 @@
-# Codeveal
+# Codeveal - Module Analyzer
 
 > **Right-click any module folder → instant AI-powered architecture map in your editor.**
 
