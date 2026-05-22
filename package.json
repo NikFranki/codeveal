@@ -2,7 +2,7 @@
   "name": "codeveal-ext",
   "displayName": "Codeveal - Module Analyzer",
   "description": "Right-click any module folder → AI-powered architecture mindmap & feature graph in your editor.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "Franki",
   "engines": {
     "vscode": "^1.85.0"
@@ -12,7 +12,9 @@
     "type": "git",
     "url": "https://github.com/NikFranki/codeveal"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -41,13 +43,27 @@
       "properties": {
         "codeveal.companyScopes": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["@scfe", "@spx", "@ssc", "@sc/", "ssc-", "sc-cli", "react-pro-components"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "@scfe",
+            "@spx",
+            "@ssc",
+            "@sc/",
+            "ssc-",
+            "sc-cli",
+            "react-pro-components"
+          ],
           "description": "Package name prefixes treated as internal company deps (shown separately in the mindmap)"
         },
         "codeveal.aiProvider": {
           "type": "string",
-          "enum": ["auto", "claude", "codex"],
+          "enum": [
+            "auto",
+            "claude",
+            "codex"
+          ],
           "enumDescriptions": [
             "Auto-detect: prefer claude, fallback to codex",
             "Force claude CLI (requires Claude Code installed)",
@@ -66,14 +82,16 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./tsconfig.json",
-    "watch": "tsc -watch -p ./tsconfig.json",
-    "vscode:prepublish": "npm run compile",
+    "compile": "node build.js",
+    "compile:check": "tsc -p ./tsconfig.json --noEmit",
+    "watch": "node build.js && tsc -watch -p ./tsconfig.json --noEmit",
+    "vscode:prepublish": "node build.js --minify",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.3.0"
   },
   "dependencies": {

@@ -5,6 +5,8 @@ src/**
 .gitignore
 .eslintrc.json
 tsconfig.json
+build.js
+.npmrc
 **/*.ts
 **/*.map
 node_modules/**
